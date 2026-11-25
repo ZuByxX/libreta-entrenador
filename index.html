@@ -440,12 +440,12 @@ function vWizard(){
   if(st===3){
     if(edit){q='Listo';hint='Pulsa Guardar para aplicar los cambios.';body=''}
     else{q='¿Quieres que te preparemos unas rutinas de ejemplo?';hint='Te servirán de punto de partida. Luego puedes cambiarlas o borrarlas.';
-    body=`<div class="list"><button type="button" class="btn btn-big ${d.sample?'btn-primary':''}" data-act="w-sample" data-id="1">Sí, créalas</button><button type="button" class="btn btn-big ${!d.sample?'btn-primary':''}" data-act="w-sample" data-id="0">No, empiezo de cero</button></div>`}}
+    body=`<div class="list"><button type="button" class="btn btn-big btn-primary" data-act="w-sample" data-id="1">Sí, créalas</button><button type="button" class="btn btn-big" data-act="w-sample" data-id="0">No, empiezo de cero</button></div>`}}
   const last=st===WIZ_STEPS-1;
   return `<div class="stack" style="gap:22px;min-height:70vh;justify-content:center;padding-top:12px">
     ${dots}<p class="label" style="text-align:center">Paso ${st+1} de ${WIZ_STEPS}</p>
     <h1 style="font-size:1.9rem">${q}</h1><p class="muted">${hint}</p>${body}
-    <div class="stack" style="margin-top:8px"><button type="button" class="btn btn-primary btn-big" data-act="w-next">${last?(edit?'Guardar':'Empezar a usar la app'):'Siguiente'}</button>
+    <div class="stack" style="margin-top:8px">${last&&!edit?'':`<button type="button" class="btn btn-primary btn-big" data-act="w-next">`}${last&&!edit?'':`${last?'Guardar':'Siguiente'}</button>`}
     ${st>0?'<button type="button" class="btn btn-big" data-act="w-back">Atrás</button>':edit?'<button type="button" class="btn btn-big" data-act="w-cancel">Cancelar</button>':''}</div></div>`;
 }
 function wizRead(){
@@ -1010,7 +1010,7 @@ document.addEventListener('click',async e=>{
     if(act==='w-word')d.wordP=id||'';
     if(act==='w-type')d.types=d.types.includes(id)?d.types.filter(x=>x!==id):[...d.types,id];
     if(act==='w-addtype'){const v=(document.getElementById('w-newtype').value||'').trim();if(v&&!d.types.includes(v))d.types.push(v)}
-    if(act==='w-sample')d.sample=id==='1';
+    if(act==='w-sample'){d.sample=id==='1';document.querySelectorAll('[data-act=w-sample]').forEach(b=>b.disabled=true);a.textContent=d.sample?'Creando rutinas…':'Un momento…';await wizNext();if(wiz)render();return}
     render();if(act==='w-word'&&!id){const el=document.getElementById('w-wordp');el&&el.focus()}return}
   if(act==='settings'){openSettings();return}
   if(act==='edit-names'){closeSheet();wiz={step:0,edit:true,d:{trainerName:CFG?.trainerName||'',appName:CFG?.appName||'',wordP:WP(),types:[...(CFG?.types||DEFAULT_TYPES)],sample:false}};render();window.scrollTo(0,0);return}
