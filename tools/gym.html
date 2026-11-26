@@ -192,8 +192,8 @@ const wp=()=>WP().toLowerCase();
 const ws=()=>(CFG&&CFG.wordS)||'cliente';
 const WS=()=>ws().charAt(0).toUpperCase()+ws().slice(1);
 const LEVELS=['Principiante','Intermedio','Avanzado'];
-const COLS=['routines','clients','sessions','measures','plans','exercises','boards'];
-const S={routines:[],clients:[],sessions:[],measures:[],plans:[],exercises:[],boards:[]};
+const COLS=['routines','clients','sessions','measures','plans','exercises','boards','days'];
+const S={routines:[],clients:[],sessions:[],measures:[],plans:[],exercises:[],boards:[],days:[]};
 const got={}; let db=null, status='loading', slow=false, readOnly=false;
 let clientTab='sesiones', progEx=null, search='', calClient='', cFilter='';
 const SHIFTS=[['manana','Mañana'],['tarde','Tarde']];
@@ -480,7 +480,7 @@ function openDay(ds){
   const t=today(), cs=classesOn(ds,true), ps=plansOn(ds);
   const title=fmtDate(ds,{weekday:'long',day:'numeric',month:'long'});
   let html='';
-  if(ds<=t){html+=boardSection(ds)+attSummary(ds);
+  if(ds<=t){html+=(boardsOn(ds).length||dayTitle(ds)?dayTitleRow(ds):'')+boardSection(ds)+attSummary(ds);
     if(cs.length)html+=`<div class="stack"><span class="label">Clases apuntadas antes</span><div class="list">${cs.map(classCard).join('')}</div></div>`}
   if(ps.length||ds>=t)html+=`<div class="stack"><span class="label">Planificado</span>${ps.length?`<div class="list">${ps.map(planCard).join('')}</div>`:'<div class="empty">Nada planificado todavía.</div>'}</div>`;
   html+=ds>=t?`<button type="button" class="btn btn-primary btn-big" data-act="new-plan" data-id="${ds}">${ic('plus')} Planificar entrenamiento</button>`:'';
@@ -723,20 +723,57 @@ function attSummary(ds){
 }
 function homeTraining(){
   const t=today(),bs=boardsOn(t);
-  if(!bs.length)return `<label class="btn btn-primary btn-big" for="home-board" style="cursor:pointer">${ic('plus')} Apuntar entrenamiento</label><input id="home-board" class="board-in" type="file" accept="image/*" data-date="${t}" hidden>
-    <p class="small muted" style="text-align:center;margin-top:-4px">Te pedirá una foto de la pizarra.</p>`;
+  if(!bs.length)return `<button type="button" class="btn btn-primary btn-big" data-act="new-day">${ic('plus')} Apuntar entrenamiento</button>
+    <p class="small muted" style="text-align:center;margin-top:-4px">Te pedirá el nombre y una foto de la pizarra.</p>`;
   const b=(sh,l)=>{const n=attOf(t,sh).length;return `<button type="button" class="btn btn-big btn-primary" data-act="att-home" data-id="${sh}" style="justify-content:space-between"><span>${l}</span>${n?`<span class="chip" style="background:var(--surface);color:var(--accent)">${n} ✓</span>`:''}</button>`};
-  return `<div class="stack" style="gap:10px"><span class="label">Entrenamiento de hoy</span>${boardThumbs(bs,true)}
+  return `<div class="stack" style="gap:10px"><span class="label">Entrenamiento de hoy</span>${dayTitleRow(t)}${boardThumbs(bs,true)}
     <p class="small muted" style="text-align:center;margin-top:-2px">Toca la foto para verla en grande o borrarla.</p>
     ${b('manana','Asistencia de mañana')}${b('tarde','Asistencia de tarde')}
     <label class="linkbtn" for="home-board2">📷 Añadir foto de otra pizarra</label><input id="home-board2" class="board-in" type="file" accept="image/*" data-date="${t}" hidden></div>`;
 }
 let attReturn=null;
+const dayTitle=ds=>{const d=S.days.find(x=>x.id===ds);return d&&d.title?d.title:''};
+const dayTitleRow=ds=>{const tt=dayTitle(ds);return `<div class="row between" style="gap:8px"><h2 style="margin:0;min-width:0" class="ellip">${tt?esc(tt):'<span class="muted">Sin nombre</span>'}</h2><button type="button" class="btn btn-ghost" style="min-height:40px;flex:none" data-act="day-name" data-id="${ds}">${tt?'Cambiar nombre':'Poner nombre'}</button></div>`};
+async function saveDayTitle(ds,title){
+  const d=S.days.find(x=>x.id===ds);
+  if(!(await save('days',ds,{...(d||{}),date:ds,title,updatedAt:Date.now(),createdAt:d&&d.createdAt||Date.now()})))return false;
+  for(const x of sessionsOn(ds).filter(x=>x.shift&&x.routineName!==title)){const dd={...x,routineName:title};delete dd.id;await save('sessions',x.id,dd)}
+  return true;
+}
+let newDayPhoto=null;
+function newDayForm(ds){
+  newDayPhoto=null;const plan=plansOn(ds)[0];
+  openSheet(ds===today()?'Entrenamiento de hoy':capFirst(fmtDate(ds,{weekday:'long',day:'numeric',month:'long'})),`
+   ${field('nd-name','¿Cómo se llama el entrenamiento?',inp('nd-name',dayTitle(ds)||(plan?planTitle(plan):''),'placeholder="Ej.: AMRAP piernas" autocomplete="off"'))}
+   <div class="field"><span>Foto de la pizarra</span><div id="nd-prev"></div>
+     <label class="btn btn-big" for="nd-photo" style="cursor:pointer" id="nd-photo-lbl">📷 Hacer o elegir foto</label><input id="nd-photo" type="file" accept="image/*" hidden></div>
+   <button type="submit" class="btn btn-primary btn-big">Guardar entrenamiento</button>`,
+  async()=>{
+    const name=fv('nd-name');if(!name){toast('Escribe el nombre del entrenamiento');document.getElementById('nd-name').focus();return}
+    if(!newDayPhoto){toast('Falta la foto de la pizarra');return}
+    if(!(await saveDayTitle(ds,name)))return;
+    if(await save('boards',uid(),{date:ds,photo:newDayPhoto,createdAt:Date.now()})){newDayPhoto=null;closeSheet();toast('Entrenamiento guardado');render()}
+  },{saveLabel:'Guardar'});
+  setTimeout(()=>document.getElementById('nd-name')?.focus(),50);
+}
+async function newDayPick(input){
+  const f=input.files&&input.files[0];input.value='';if(!f)return;
+  try{newDayPhoto=await boardImage(f)}catch(e){toast('No se pudo abrir la foto');return}
+  document.getElementById('nd-prev').innerHTML=`<div class="boards one" style="margin-bottom:8px"><button type="button" tabindex="-1" style="cursor:default"><img src="${newDayPhoto}" alt="Foto de la pizarra"></button></div>`;
+  document.getElementById('nd-photo-lbl').textContent='📷 Cambiar foto';
+}
+function dayNameForm(ds){
+  openSheet('Nombre del entrenamiento',`${field('dn-name','¿Cómo se llama el entrenamiento?',inp('dn-name',dayTitle(ds),'placeholder="Ej.: AMRAP piernas" autocomplete="off"'))}`,
+  async()=>{const name=fv('dn-name');if(!name){toast('Escribe el nombre');return}const back=reopen;if(await saveDayTitle(ds,name)){toast('Nombre guardado');if(back)back();else{closeSheet();render()}}});
+  setTimeout(()=>document.getElementById('dn-name')?.select(),50);
+}
 function trainingDay(ds){
+  if(!boardsOn(ds).length&&!dayTitle(ds)&&!sessionsOn(ds).some(x=>x.shift)){newDayForm(ds);return}
   const bs=boardsOn(ds),plan=plansOn(ds)[0],nm=attOf(ds,'manana').length,nt=attOf(ds,'tarde').length;
   const title=ds===today()?'Entrenamiento de hoy':capFirst(fmtDate(ds,{weekday:'long',day:'numeric',month:'long'}));
   openSheet(title,`
-   ${plan?`<p class="muted">Tocaba: <b>${esc(planTitle(plan))}</b></p>`:''}
+   ${dayTitleRow(ds)}
+   ${plan&&planTitle(plan)!==dayTitle(ds)?`<p class="muted small">Planificado: ${esc(planTitle(plan))}</p>`:''}
    ${bs.length?`${boardThumbs(bs)}${boardBtn(ds,'Añadir otra foto')}`
      :`<p class="muted">Haz una foto a la pizarra con el entrenamiento. No hace falta escribir los ejercicios.</p>${boardBtn(ds,'Foto de la pizarra',true)}`}
    ${bs.length||nm||nt?`<button type="button" class="btn btn-primary btn-big" data-act="att-menu" data-id="${ds}">${ic('users')} Asistencia a la clase</button>
@@ -768,13 +805,13 @@ function attForm(ds,sh){
   ()=>saveAtt(ds,sh,ex),{saveLabel:'Guardar'});
 }
 async function saveAtt(ds,sh,ex){
-  const plan=plansOn(ds)[0],rn=plan?planTitle(plan):'Clase de '+(sh==='manana'?'mañana':'tarde');
+  const plan=plansOn(ds)[0],rn=dayTitle(ds)||(plan?planTitle(plan):'Clase de '+(sh==='manana'?'mañana':'tarde'));
   let n=0,ok=true;
   for(const el of document.querySelectorAll('#sheet .att')){
     const cid=el.dataset.cid,on=el.querySelector('[data-act=att-toggle]').getAttribute('aria-pressed')==='true',x=ex.get(cid);
     if(on){n++;const sc=el.querySelector('[data-act=att-score][aria-pressed="true"]');
       const d={...(x||{}),clientId:cid,date:ds,shift:sh,duration:'60',score:sc?+sc.dataset.id:null,notes:el.querySelector('.att-note').value.trim(),
-        routineId:x?x.routineId||null:(plan&&plan.routineId)||null,routineName:x&&x.routineName||rn,planId:x&&x.planId||(plan&&plan.id)||null,exercises:x&&x.exercises||[],createdAt:x&&x.createdAt||Date.now(),updatedAt:Date.now()};
+        routineId:x?x.routineId||null:(plan&&plan.routineId)||null,routineName:dayTitle(ds)||(x&&x.routineName)||rn,planId:x&&x.planId||(plan&&plan.id)||null,exercises:x&&x.exercises||[],createdAt:x&&x.createdAt||Date.now(),updatedAt:Date.now()};
       delete d.id;ok=(await save('sessions',x?x.id:uid(),d))&&ok}
     else if(x)ok=(await remove('sessions',x.id))&&ok;
   }
@@ -1129,6 +1166,8 @@ document.addEventListener('click',async e=>{
     case 'att-menu':attMenu(id);break;
     case 'att-shift':{const [d,sh]=id.split('|');attReturn=()=>attMenu(d);attForm(d,sh);break}
     case 'att-home':attReturn=null;attForm(today(),id);break;
+    case 'new-day':newDayForm(today());break;
+    case 'day-name':dayNameForm(id);break;
     case 'att-toggle':{const on=a.getAttribute('aria-pressed')!=='true';a.setAttribute('aria-pressed',String(on));a.querySelector('.tick').textContent=on?'✓':'';const m=a.parentElement.querySelector('.att-more');if(m)m.hidden=!on;break}
     case 'att-score':{const on=a.getAttribute('aria-pressed')!=='true';a.parentElement.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(on&&b===a)));break}
     case 'new-weight':weightForm(id);break;
@@ -1152,6 +1191,7 @@ document.addEventListener('input',e=>{if(e.target.id==='pk-q'){drawPicker();retu
   if(e.target.id==='q'){search=e.target.value;const l=document.getElementById('clist');const list=clientsFiltered();l.innerHTML=list.length?list.map(clientCard).join(''):'<div class="empty">Nadie con ese nombre.</div>'}
 });
 document.addEventListener('change',async e=>{
+  if(e.target.id==='nd-photo'){newDayPick(e.target);return}
   if(e.target.classList&&e.target.classList.contains('board-in')){addBoard(e.target);return}
   if(e.target.id==='f-photo-in'||e.target.id==='prof-photo'){const f=e.target.files&&e.target.files[0];if(!f)return;
     let url;try{url=await photoThumb(f)}catch(err){toast('No se pudo abrir la foto');return}
