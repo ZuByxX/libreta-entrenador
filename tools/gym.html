@@ -789,33 +789,56 @@ function attMenu(ds){
    <button type="button" class="btn btn-ghost" data-act="training-day" data-id="${ds}">${ic('back')} Volver a la pizarra</button>`,
   closeSheet,{saveLabel:'Cerrar',info:true});
 }
+let att=null;
+const nameKey=t=>String(t||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 function attForm(ds,sh){
   const ex=new Map(attOf(ds,sh).map(x=>[x.clientId,x]));
-  const people=S.clients.filter(c=>c.active!==false&&inShift(c,sh)).sort(byName);
-  ex.forEach((x,cid)=>{if(!people.some(c=>c.id===cid)){const c=byId('clients',cid);if(c)people.push(c)}});
-  const lbl=sh==='manana'?'mañana':'tarde';
-  const row=c=>{const x=ex.get(c.id),on=!!x;return `<div class="att stack" style="gap:0" data-cid="${esc(c.id)}">
-    <button type="button" class="card cli pickp" data-act="att-toggle" aria-pressed="${on}">${avatar(c)}<span class="txt"><span class="name">${esc(c.name)}</span>${c.injuries?`<span class="small muted ellip">⚠︎ ${esc(c.injuries)}</span>`:''}</span><span class="tick">${on?'✓':''}</span></button>
-    <div class="att-more"${on?'':' hidden'}><span class="small muted">Nota del entreno (1 a 10)</span>
-     <div class="scores">${[1,2,3,4,5,6,7,8,9,10].map(n=>`<button type="button" data-act="att-score" data-id="${n}" aria-pressed="${!!x&&x.score===n}">${n}</button>`).join('')}</div>
-     <input class="att-note" value="${esc(x?.notes)}" placeholder="Comentario (opcional)" aria-label="Comentario sobre ${esc(c.name)}"></div></div>`};
-  openSheet('Asistencia de '+lbl,`<p class="muted">Toca a cada persona que ha venido y ponle una nota del 1 al 10. El comentario es opcional.</p>
-   ${people.length?`<div class="list">${people.map(row).join('')}</div>`:`<div class="empty">No tienes ${wp()} de ${lbl}. Añádelos en la pestaña ${WP()}.</div>`}
-   <button type="submit" class="btn btn-primary btn-big">Guardar asistencia</button>`,
-  ()=>saveAtt(ds,sh,ex),{saveLabel:'Guardar'});
+  att={ds,sh,ex,sel:new Set(ex.keys()),score:{},note:{}};
+  ex.forEach((x,cid)=>{att.score[cid]=x.score||null;att.note[cid]=x.notes||''});
+  attStep1();
 }
-async function saveAtt(ds,sh,ex){
+function attPeople(){
+  const people=S.clients.filter(c=>c.active!==false&&inShift(c,att.sh)).sort(byName);
+  att.ex.forEach((x,cid)=>{if(!people.some(c=>c.id===cid)){const c=byId('clients',cid);if(c)people.push(c)}});
+  return people;
+}
+const attLbl=()=>att.sh==='manana'?'mañana':'tarde';
+function attStep1(){
+  const people=attPeople();
+  openSheet('Asistencia de '+attLbl(),`<p class="muted">Paso 1 de 2 · Toca a las personas que han venido.</p>
+   ${people.length>5?`<input id="att-q" type="search" placeholder="Buscar por nombre" autocomplete="off">`:''}
+   ${people.length?`<div class="list" id="att-list">${people.map(c=>{const on=att.sel.has(c.id);return `<button type="button" class="card cli pickp" data-act="att-toggle" data-id="${esc(c.id)}" data-name="${esc(nameKey(c.name))}" aria-pressed="${on}">${avatar(c)}<span class="txt"><span class="name">${esc(c.name)}</span>${c.injuries?`<span class="small muted ellip">⚠︎ ${esc(c.injuries)}</span>`:''}</span><span class="tick">${on?'✓':''}</span></button>`}).join('')}</div><p class="empty" id="att-none" style="display:none">Nadie con ese nombre.</p>`
+     :`<div class="empty">No tienes ${wp()} de ${attLbl()}. Añádelos en la pestaña ${WP()}.</div>`}
+   <button type="submit" class="btn btn-primary btn-big" id="att-next">Siguiente</button>`,
+  ()=>{if(!att.sel.size){if(att.ex.size){saveAtt();return}toast('Marca a las personas que han venido');return}attStep2()},{saveLabel:'Siguiente',noTop:true});
+  attCount();
+}
+function attCount(){const b=document.getElementById('att-next');if(b)b.textContent=att.sel.size?`Siguiente (${att.sel.size})`:(att.ex.size?'Guardar: no ha venido nadie':'Siguiente')}
+function attStep2(){
+  const people=attPeople().filter(c=>att.sel.has(c.id));
+  openSheet('Notas del entreno',`<p class="muted">Paso 2 de 2 · Ponle a cada uno una nota del 1 al 10. El comentario es opcional.</p>
+   <div class="list">${people.map(c=>`<div class="card att-rate" data-cid="${esc(c.id)}"><div class="row" style="gap:12px">${avatar(c)}<b class="ellip" style="min-width:0">${esc(c.name)}</b></div>
+     <div class="scores" style="margin-top:10px">${[1,2,3,4,5,6,7,8,9,10].map(n=>`<button type="button" data-act="att-score" data-id="${n}" aria-pressed="${att.score[c.id]===n}">${n}</button>`).join('')}</div>
+     <input class="att-note" style="margin-top:8px" value="${esc(att.note[c.id]||'')}" placeholder="Comentario (opcional)" aria-label="Comentario sobre ${esc(c.name)}"></div>`).join('')}</div>
+   <button type="submit" class="btn btn-primary btn-big">Guardar asistencia</button>
+   <button type="button" class="btn btn-big" data-act="att-back">Atrás</button>`,
+  ()=>{attReadRates();saveAtt()},{saveLabel:'Guardar'});
+}
+function attReadRates(){document.querySelectorAll('#sheet .att-rate').forEach(el=>{const cid=el.dataset.cid,sc=el.querySelector('[data-act=att-score][aria-pressed="true"]');att.score[cid]=sc?+sc.dataset.id:null;att.note[cid]=el.querySelector('.att-note').value.trim()})}
+document.addEventListener('input',e=>{if(e.target.id!=='att-q')return;const q=nameKey(e.target.value);let n=0;
+  document.querySelectorAll('#att-list [data-act=att-toggle]').forEach(b=>{const show=!q||b.dataset.name.includes(q);b.hidden=!show;if(show)n++});
+  const none=document.getElementById('att-none');if(none)none.style.display=n>0?'none':''});
+async function saveAtt(){
+  const {ds,sh,ex,sel}=att;
   const plan=plansOn(ds)[0],rn=dayTitle(ds)||(plan?planTitle(plan):'Clase de '+(sh==='manana'?'mañana':'tarde'));
-  let n=0,ok=true;
-  for(const el of document.querySelectorAll('#sheet .att')){
-    const cid=el.dataset.cid,on=el.querySelector('[data-act=att-toggle]').getAttribute('aria-pressed')==='true',x=ex.get(cid);
-    if(on){n++;const sc=el.querySelector('[data-act=att-score][aria-pressed="true"]');
-      const d={...(x||{}),clientId:cid,date:ds,shift:sh,duration:'60',score:sc?+sc.dataset.id:null,notes:el.querySelector('.att-note').value.trim(),
-        routineId:x?x.routineId||null:(plan&&plan.routineId)||null,routineName:dayTitle(ds)||(x&&x.routineName)||rn,planId:x&&x.planId||(plan&&plan.id)||null,exercises:x&&x.exercises||[],createdAt:x&&x.createdAt||Date.now(),updatedAt:Date.now()};
-      delete d.id;ok=(await save('sessions',x?x.id:uid(),d))&&ok}
-    else if(x)ok=(await remove('sessions',x.id))&&ok;
-  }
-  if(ok){toast(n?`Asistencia guardada: ${n} ${n===1?'persona':'personas'}`:'Asistencia guardada');if(attReturn)attReturn();else{closeSheet();render()}}
+  let ok=true;
+  for(const cid of sel){const x=ex.get(cid);
+    const d={...(x||{}),clientId:cid,date:ds,shift:sh,duration:'60',score:att.score[cid]||null,notes:att.note[cid]||'',
+      routineId:x?x.routineId||null:(plan&&plan.routineId)||null,routineName:dayTitle(ds)||(x&&x.routineName)||rn,planId:x&&x.planId||(plan&&plan.id)||null,exercises:x&&x.exercises||[],createdAt:x&&x.createdAt||Date.now(),updatedAt:Date.now()};
+    delete d.id;ok=(await save('sessions',x?x.id:uid(),d))&&ok}
+  for(const [cid,x] of ex)if(!sel.has(cid))ok=(await remove('sessions',x.id))&&ok;
+  const n=sel.size;
+  if(ok){att=null;toast(n?`Asistencia guardada: ${n} ${n===1?'persona':'personas'}`:'Asistencia guardada');if(attReturn)attReturn();else{closeSheet();render()}}
 }
 
 /* peso: historial con fecha, objetivo y gráfica */
@@ -1168,7 +1191,8 @@ document.addEventListener('click',async e=>{
     case 'att-home':attReturn=null;attForm(today(),id);break;
     case 'new-day':newDayForm(today());break;
     case 'day-name':dayNameForm(id);break;
-    case 'att-toggle':{const on=a.getAttribute('aria-pressed')!=='true';a.setAttribute('aria-pressed',String(on));a.querySelector('.tick').textContent=on?'✓':'';const m=a.parentElement.querySelector('.att-more');if(m)m.hidden=!on;break}
+    case 'att-toggle':{if(!att)break;const on=a.getAttribute('aria-pressed')!=='true';a.setAttribute('aria-pressed',String(on));a.querySelector('.tick').textContent=on?'✓':'';if(on)att.sel.add(id);else att.sel.delete(id);attCount();break}
+    case 'att-back':if(att){attReadRates();attStep1()}break;
     case 'att-score':{const on=a.getAttribute('aria-pressed')!=='true';a.parentElement.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(on&&b===a)));break}
     case 'new-weight':weightForm(id);break;
     case 'weight-chart':weightChart(id);break;
