@@ -352,6 +352,9 @@ function vClient(id){
   }else{
     body=`<div class="card"><dl class="kv">
       <dt>Horario</dt><dd>${esc(shiftName(c.shift)||'—')}</dd>
+      <dt>Días por semana</dt><dd>${c.daysPerWeek?c.daysPerWeek+(c.daysPerWeek===1?' día':' días'):'—'}</dd>
+      <dt>Peso</dt><dd>${c.weight?esc(String(c.weight).replace('.',','))+' kg':'—'}</dd>
+      <dt>Altura</dt><dd>${c.height?esc(String(c.height).replace('.',','))+' cm':'—'}</dd>
       <dt>Indicaciones</dt><dd>${esc(c.injuries||'Ninguna')}</dd>
       <dt>Desde</dt><dd>${esc(fmtDate(c.startDate))}</dd>
       <dt>Estado</dt><dd>${c.active===false?'De baja':'Activo'}</dd></dl></div>
@@ -564,6 +567,9 @@ function clientForm(c){
    <div class="field"><span>¿Viene de mañana o de tarde?</span><small>Puedes marcar las dos si unos días viene por la mañana y otros por la tarde.</small>
      <div class="grid2" id="shift-btns">${SHIFTS.map(([v,l])=>`<button type="button" class="btn btn-big ${inShift(c||{},v)&&c?.shift?'btn-primary':''}" data-act="f-shift" data-id="${v}" aria-pressed="${!!(c?.shift&&inShift(c,v))}">${l}</button>`).join('')}</div></div>
    ${field('f-start','Empezó el',inp('f-start',c?.startDate||today(),'type="date"'))}
+   <div class="field"><span>¿Cuántos días a la semana viene?</span>
+     <div class="row" id="days-btns" style="gap:6px">${[1,2,3,4,5,6].map(n=>`<button type="button" class="btn ${c?.daysPerWeek===n?'btn-primary':''}" style="flex:1;min-width:0;padding-left:0;padding-right:0" data-act="f-days" data-id="${n}" aria-pressed="${c?.daysPerWeek===n}">${n}</button>`).join('')}</div></div>
+   <div class="grid2">${field('f-weight','Peso (kg)',inp('f-weight',c?.weight??'','inputmode="decimal" placeholder="Ej.: 70"'))}${field('f-height','Altura (cm)',inp('f-height',c?.height??'','inputmode="numeric" placeholder="Ej.: 175"'))}</div>
    ${field('f-inj','Indicaciones',inp('f-inj',c?.injuries,'placeholder="Ej.: cuidado con la rodilla derecha"'),'Saldrán siempre a la vista en su ficha.')}
    ${field('f-notes','Anotaciones',`<textarea id="f-notes" placeholder="Lo que quieras recordar">${esc(c?.notes)}</textarea>`)}
    ${c?field('f-active','Estado',sel('f-active',[['1','Activo'],['0','De baja']],c.active===false?'0':'1')):''}`,
@@ -571,8 +577,9 @@ function clientForm(c){
     const name=fv('f-name');if(!name){toast('Escribe el nombre del '+ws());document.getElementById('f-name').focus();return}
     const sh=[...document.querySelectorAll('#shift-btns [aria-pressed="true"]')].map(b=>b.dataset.id);
     if(!sh.length){toast('Elige si viene de mañana, de tarde o las dos');return}
+    const num=v=>{v=(v||'').replace(',','.').replace(/[^\d.]/g,'');const n=parseFloat(v);return isFinite(n)&&n>0?Math.round(n*10)/10:null};
     const id=c?.id||uid();
-    const data={...(c||{}),name,photo:document.getElementById('f-photo').value||c?.photo||null,shift:sh.length===2?'ambos':sh[0],startDate:fv('f-start')||null,injuries:fv('f-inj'),notes:fv('f-notes'),active:c?fv('f-active')!=='0':true,createdAt:c?.createdAt||Date.now()};
+    const data={...(c||{}),name,daysPerWeek:+(document.querySelector('#days-btns [aria-pressed="true"]')?.dataset.id||0)||null,weight:num(fv('f-weight')),height:num(fv('f-height')),photo:document.getElementById('f-photo').value||c?.photo||null,shift:sh.length===2?'ambos':sh[0],startDate:fv('f-start')||null,injuries:fv('f-inj'),notes:fv('f-notes'),active:c?fv('f-active')!=='0':true,createdAt:c?.createdAt||Date.now()};
     delete data.id;
     if(await save('clients',id,data)){closeSheet();toast(c?'Ficha guardada':WS()+' creado');if(!c)go('cliente-'+id)}
   });
@@ -635,7 +642,7 @@ async function exportXlsx(btn){
     const X=await loadXLSX();
     const cname=id=>byId('clients',id)?.name||'(borrado)';
     const exCols=e=>({'Ejercicio':e.name,'Clase de ejercicio':e.kind==='cardio'?'Cardio':'Ejercicio','Series':e.sets||'','Repeticiones':e.reps||'','Peso (kg)':e.weight??'','Minutos':e.mins||'','Intensidad':e.intensity||''});
-    const alumnos=[...S.clients].sort((a,b)=>a.name.localeCompare(b.name,'es')).map(c=>{const ss=sessionsOf(c.id);return {'Nombre':c.name,'Horario':shiftName(c.shift),'Empezó el':c.startDate||'','Indicaciones':c.injuries||'','Anotaciones':c.notes||'','Estado':c.active===false?'De baja':'Activo','Entrenamientos':ss.length,'Última clase':ss[0]?.date||''}});
+    const alumnos=[...S.clients].sort((a,b)=>a.name.localeCompare(b.name,'es')).map(c=>{const ss=sessionsOf(c.id);return {'Nombre':c.name,'Horario':shiftName(c.shift),'Empezó el':c.startDate||'','Días por semana':c.daysPerWeek||'','Peso (kg)':c.weight??'','Altura (cm)':c.height??'','Indicaciones':c.injuries||'','Anotaciones':c.notes||'','Estado':c.active===false?'De baja':'Activo','Entrenamientos':ss.length,'Última clase':ss[0]?.date||''}});
     const entrenos=[];[...S.sessions].sort((a,b)=>(a.date||'').localeCompare(b.date||'')).forEach(x=>{const base={'Fecha':x.date,[WS()]:cname(x.clientId),'Entrenamiento':x.routineName||'Sesión libre','Esfuerzo (1-10)':x.rpe??'','Notas':x.notes||''};const ex=(x.exercises||[]).filter(e=>e.name);if(!ex.length)entrenos.push(base);else ex.forEach(e=>entrenos.push({...base,...exCols(e)}))});
     const rutinas=[];[...S.routines].sort((a,b)=>a.name.localeCompare(b.name,'es')).forEach(r=>{const bl=blocksOf(r);const ex=r.exercises||[];const base={'Rutina':r.name,'Tipo':r.type||typeLabel(bl),'Descripción':r.description||''};if(!ex.length)rutinas.push(base);else ex.forEach(e=>{const b=bl[Math.min(+e.block||0,bl.length-1)]||{};rutinas.push({...base,'Parte':bl.length>1?`${(+e.block||0)+1} · ${b.type}`:(b.type||''),...exCols(e)})})});
     const calendario=[...S.plans].sort((a,b)=>a.date.localeCompare(b.date)).map(p=>({'Fecha':p.date,'Entrenamiento':planTitle(p),'Tipo':p.type||'','Notas':p.notes||'','Apuntada':S.sessions.some(x=>x.planId===p.id)?'Sí':'No','Asistentes':S.sessions.filter(x=>x.planId===p.id).length}));
@@ -939,6 +946,7 @@ document.addEventListener('click',async e=>{
     case 'confirm-no':closeConfirm();break;
     case 'p-group':{document.getElementById('p-group').value=id;a.parentElement.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b===a)));break}
     case 'pfilter':{a.parentElement.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b===a)));document.querySelectorAll('.pickp').forEach(b=>{b.hidden=!!id&&b.dataset.shift!==id&&b.dataset.shift!=='ambos'});break}
+    case 'f-days':{const on=a.getAttribute('aria-pressed')!=='true';document.querySelectorAll('#days-btns button').forEach(b=>{const m=on&&b===a;b.setAttribute('aria-pressed',String(m));b.classList.toggle('btn-primary',m)});break}
     case 'f-shift':{const on=a.getAttribute('aria-pressed')!=='true';a.setAttribute('aria-pressed',String(on));a.classList.toggle('btn-primary',on);break}
     case 'open-day':openDay(id);break;
     case 'new-plan':planForm(id);break;
