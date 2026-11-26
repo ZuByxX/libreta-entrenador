@@ -67,6 +67,9 @@ button.card:active{background:var(--surface-2)}
 .wstat{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .wstat div{display:flex;flex-direction:column;gap:2px}
 .wstat b{font-size:1.5rem}
+.boards.one{grid-template-columns:1fr}
+.boards.one button{aspect-ratio:auto;height:170px}
+.linkbtn{background:none;border:0;color:var(--accent);font:inherit;font-weight:600;font-size:.95rem;padding:10px;cursor:pointer;text-align:center;align-self:center}
 .boards{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .boards button{padding:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;aspect-ratio:1;background:var(--surface-2);cursor:pointer}
 .boards img{width:100%;height:100%;object-fit:cover;display:block}
@@ -298,9 +301,9 @@ function vHome(){
   </div>
   ${todayPlans()}
   <div class="section">
-    <button class="btn btn-primary btn-big" data-act="pick-session">${ic('plus')} Apuntar entrenamiento</button>
+    ${homeTraining()}
   </div>
-  ${act.length===0?`<div class="section"><div class="help"><h3>Cómo empezar</h3><p>1. En <b>Rutinas</b>, crea tus entrenamientos (AMRAP, EMOM…).</p><p>2. En <b>${WP()}</b>, añade a cada persona con su foto y si viene de mañana o de tarde.</p><p>3. En <b>Calendario</b>, elige qué entrenamiento toca cada día.</p><p>4. Después de cada clase, pulsa <b>Apuntar entrenamiento</b>, haz la foto de la pizarra y pasa asistencia.</p></div></div>`:''}
+  ${act.length===0?`<div class="section"><div class="help"><h3>Cómo empezar</h3><p>1. En <b>Rutinas</b>, crea tus entrenamientos (AMRAP, EMOM…).</p><p>2. En <b>${WP()}</b>, añade a cada persona con su foto y si viene de mañana o de tarde.</p><p>3. En <b>Calendario</b>, elige qué entrenamiento toca cada día.</p><p>4. Cada día, pulsa <b>Apuntar entrenamiento</b> y haz la foto de la pizarra. Después pasa asistencia de mañana y de tarde.</p></div></div>`:''}
   ${need.length?`<div class="section"><div class="row between"><h2>Llevan más de una semana sin venir</h2></div><div class="list">${need.map(clientCard).join('')}</div></div>`:''}
   <div class="section"><h2>Últimos entrenamientos</h2>
   ${recent.length?`<div class="list">${recent.map(s=>{const c=byId('clients',s.clientId);return `<button class="card" data-go="cliente-${esc(s.clientId)}"><span class="row between"><b>${esc(c?c.name:WS()+' borrado')}</b><span class="small muted">${esc(fmtDate(s.date))}</span></span><span class="small muted ellip">${esc(s.routineName||'Sesión libre')}${s.rpe?` · Esfuerzo ${s.rpe}/10`:''}</span></button>`}).join('')}</div>`:'<div class="empty">Aquí verás los entrenamientos que apuntes.</div>'}
@@ -363,7 +366,7 @@ function vClient(id){
     body=`<div class="card"><dl class="kv">
       <dt>Horario</dt><dd>${esc(shiftName(c.shift)||'—')}</dd>
       <dt>Días por semana</dt><dd>${c.daysPerWeek?c.daysPerWeek+(c.daysPerWeek===1?' día':' días'):'—'}</dd>
-      <dt>Peso</dt><dd>${curWeight(c)!=null?fmtKg(curWeight(c))+' kg':'—'}${c.goalWeight!=null?' · objetivo '+fmtKg(c.goalWeight)+' kg':''}</dd>
+      <dt>Peso</dt><dd>${curWeight(c)!=null?fmtKg(curWeight(c))+' kg':'—'}</dd>
       <dt>Altura</dt><dd>${c.height?esc(String(c.height).replace('.',','))+' cm':'—'}</dd>
       <dt>Indicaciones</dt><dd>${esc(c.injuries||'Ninguna')}</dd>
       <dt>Desde</dt><dd>${esc(fmtDate(c.startDate))}</dd>
@@ -583,9 +586,8 @@ function clientForm(c){
    ${field('f-start','Empezó el',inp('f-start',c?.startDate||today(),'type="date"'))}
    <div class="field"><span>¿Cuántos días a la semana viene?</span>
      <div class="row" id="days-btns" style="gap:6px">${[1,2,3,4,5,6].map(n=>`<button type="button" class="btn ${c?.daysPerWeek===n?'btn-primary':''}" style="flex:1;min-width:0;padding-left:0;padding-right:0" data-act="f-days" data-id="${n}" aria-pressed="${c?.daysPerWeek===n}">${n}</button>`).join('')}</div></div>
-   <div class="grid2">${field('f-weight','Peso (kg)',inp('f-weight',c&&curWeight(c)!=null?fmtKg(curWeight(c)):'','inputmode="decimal" placeholder="Ej.: 70"'))}${field('f-goal','Peso objetivo (kg)',inp('f-goal',c?.goalWeight!=null?fmtKg(c.goalWeight):'','inputmode="decimal" placeholder="Ej.: 65"'))}</div>
-   <small class="muted" style="margin-top:-8px">El peso se guarda con la fecha de hoy para ver su evolución.</small>
-   ${field('f-height','Altura (cm)',inp('f-height',c?.height??'','inputmode="numeric" placeholder="Ej.: 175"'))}
+   <div class="grid2">${field('f-weight','Peso actual (kg)',inp('f-weight',c&&curWeight(c)!=null?fmtKg(curWeight(c)):'','inputmode="decimal" placeholder="Ej.: 70"'))}${field('f-height','Altura (cm)',inp('f-height',c?.height??'','inputmode="numeric" placeholder="Ej.: 175"'))}</div>
+   <small class="muted" style="margin-top:-8px">El peso se guarda con la fecha de hoy. Luego puedes ir apuntando pesos nuevos en su pestaña Peso.</small>
    ${field('f-inj','Indicaciones',inp('f-inj',c?.injuries,'placeholder="Ej.: cuidado con la rodilla derecha"'),'Saldrán siempre a la vista en su ficha.')}
    ${field('f-notes','Anotaciones',`<textarea id="f-notes" placeholder="Lo que quieras recordar">${esc(c?.notes)}</textarea>`)}
    ${c?field('f-active','Estado',sel('f-active',[['1','Activo'],['0','De baja']],c.active===false?'0':'1')):''}`,
@@ -595,7 +597,7 @@ function clientForm(c){
     if(!sh.length){toast('Elige si viene de mañana, de tarde o las dos');return}
     const num=v=>{v=(v||'').replace(',','.').replace(/[^\d.]/g,'');const n=parseFloat(v);return isFinite(n)&&n>0?Math.round(n*10)/10:null};
     const id=c?.id||uid();
-    const data={...(c||{}),name,daysPerWeek:+(document.querySelector('#days-btns [aria-pressed="true"]')?.dataset.id||0)||null,weight:num(fv('f-weight')),goalWeight:num(fv('f-goal')),height:num(fv('f-height')),photo:document.getElementById('f-photo').value||c?.photo||null,shift:sh.length===2?'ambos':sh[0],startDate:fv('f-start')||null,injuries:fv('f-inj'),notes:fv('f-notes'),active:c?fv('f-active')!=='0':true,createdAt:c?.createdAt||Date.now()};
+    const data={...(c||{}),name,daysPerWeek:+(document.querySelector('#days-btns [aria-pressed="true"]')?.dataset.id||0)||null,weight:num(fv('f-weight')),height:num(fv('f-height')),photo:document.getElementById('f-photo').value||c?.photo||null,shift:sh.length===2?'ambos':sh[0],startDate:fv('f-start')||null,injuries:fv('f-inj'),notes:fv('f-notes'),active:c?fv('f-active')!=='0':true,createdAt:c?.createdAt||Date.now()};
     delete data.id;
     const before=c?curWeight(c):null;
     if(await save('clients',id,data)){if(data.weight!=null&&data.weight!==before)await upsertWeight(id,today(),data.weight);closeSheet();toast(c?'Ficha guardada':WS()+' creado');if(!c)go('cliente-'+id)}
@@ -659,7 +661,7 @@ async function exportXlsx(btn){
     const X=await loadXLSX();
     const cname=id=>byId('clients',id)?.name||'(borrado)';
     const exCols=e=>({'Ejercicio':e.name,'Clase de ejercicio':e.kind==='cardio'?'Cardio':'Ejercicio','Series':e.sets||'','Repeticiones':e.reps||'','Peso (kg)':e.weight??'','Minutos':e.mins||'','Intensidad':e.intensity||''});
-    const alumnos=[...S.clients].sort((a,b)=>a.name.localeCompare(b.name,'es')).map(c=>{const ss=sessionsOf(c.id);return {'Nombre':c.name,'Horario':shiftName(c.shift),'Empezó el':c.startDate||'','Días por semana':c.daysPerWeek||'','Peso (kg)':curWeight(c)??'','Peso objetivo (kg)':c.goalWeight??'','Altura (cm)':c.height??'','Indicaciones':c.injuries||'','Anotaciones':c.notes||'','Estado':c.active===false?'De baja':'Activo','Entrenamientos':ss.length,'Última clase':ss[0]?.date||''}});
+    const alumnos=[...S.clients].sort((a,b)=>a.name.localeCompare(b.name,'es')).map(c=>{const ss=sessionsOf(c.id);return {'Nombre':c.name,'Horario':shiftName(c.shift),'Empezó el':c.startDate||'','Días por semana':c.daysPerWeek||'','Peso (kg)':curWeight(c)??'','Altura (cm)':c.height??'','Indicaciones':c.injuries||'','Anotaciones':c.notes||'','Estado':c.active===false?'De baja':'Activo','Entrenamientos':ss.length,'Última clase':ss[0]?.date||''}});
     const entrenos=[];[...S.sessions].sort((a,b)=>(a.date||'').localeCompare(b.date||'')).forEach(x=>{const base={'Fecha':x.date,[WS()]:cname(x.clientId),'Entrenamiento':x.routineName||'Sesión libre','Clase':x.shift?(x.shift==='manana'?'Mañana':'Tarde'):'','Nota (1-10)':x.score??'','Esfuerzo (1-10)':x.rpe??'','Notas':x.notes||''};const ex=(x.exercises||[]).filter(e=>e.name);if(!ex.length)entrenos.push(base);else ex.forEach(e=>entrenos.push({...base,...exCols(e)}))});
     const rutinas=[];[...S.routines].sort((a,b)=>a.name.localeCompare(b.name,'es')).forEach(r=>{const bl=blocksOf(r);const ex=r.exercises||[];const base={'Rutina':r.name,'Tipo':r.type||typeLabel(bl),'Descripción':r.description||''};if(!ex.length)rutinas.push(base);else ex.forEach(e=>{const b=bl[Math.min(+e.block||0,bl.length-1)]||{};rutinas.push({...base,'Parte':bl.length>1?`${(+e.block||0)+1} · ${b.type}`:(b.type||''),...exCols(e)})})});
     const calendario=[...S.plans].sort((a,b)=>a.date.localeCompare(b.date)).map(p=>({'Fecha':p.date,'Entrenamiento':planTitle(p),'Tipo':p.type||'','Notas':p.notes||'','Apuntada':S.sessions.some(x=>x.planId===p.id)?'Sí':'No','Asistentes':S.sessions.filter(x=>x.planId===p.id).length}));
@@ -683,7 +685,7 @@ const boardsOn=ds=>S.boards.filter(b=>b.date===ds).sort((a,b)=>(a.createdAt||0)-
 const okImg=u=>typeof u==='string'&&/^data:image\/(jpeg|png|webp);base64,/.test(u);
 let boardSeq=0, reopen=null;
 function boardBtn(ds,label,primary){const k='board-in-'+(++boardSeq);return `<label class="btn btn-big${primary?' btn-primary':''}" for="${k}" style="cursor:pointer">📷 ${esc(label)}</label><input id="${k}" class="board-in" type="file" accept="image/*" data-date="${esc(ds)}" hidden>`}
-const boardThumbs=bs=>`<div class="boards">${bs.map(b=>`<button type="button" data-act="board-view" data-id="${esc(b.id)}" aria-label="Ver foto de la pizarra">${okImg(b.photo)?`<img src="${b.photo}" alt="">`:''}</button>`).join('')}</div>`;
+const boardThumbs=(bs,big)=>`<div class="boards${big&&bs.length===1?' one':''}">${bs.map(b=>`<button type="button" data-act="board-view" data-id="${esc(b.id)}" aria-label="Ver foto de la pizarra">${okImg(b.photo)?`<img src="${b.photo}" alt="">`:''}</button>`).join('')}</div>`;
 function boardSection(ds){
   const bs=boardsOn(ds);
   return `<div class="stack"><span class="label">Pizarra</span>${bs.length?boardThumbs(bs):'<p class="small muted">Haz una foto a la pizarra para guardar el entrenamiento de este día.</p>'}
@@ -719,6 +721,17 @@ function attSummary(ds){
   return `<div class="stack"><span class="label">Asistencia</span>${body||'<p class="small muted">Todavía no se ha pasado asistencia este día.</p>'}
    <button type="button" class="btn btn-primary btn-big" data-act="att-menu" data-id="${ds}">${ic('users')} Asistencia a la clase</button></div>`;
 }
+function homeTraining(){
+  const t=today(),bs=boardsOn(t);
+  if(!bs.length)return `<label class="btn btn-primary btn-big" for="home-board" style="cursor:pointer">${ic('plus')} Apuntar entrenamiento</label><input id="home-board" class="board-in" type="file" accept="image/*" data-date="${t}" hidden>
+    <p class="small muted" style="text-align:center;margin-top:-4px">Te pedirá una foto de la pizarra.</p>`;
+  const b=(sh,l)=>{const n=attOf(t,sh).length;return `<button type="button" class="btn btn-big btn-primary" data-act="att-home" data-id="${sh}" style="justify-content:space-between"><span>${l}</span>${n?`<span class="chip" style="background:var(--surface);color:var(--accent)">${n} ✓</span>`:''}</button>`};
+  return `<div class="stack" style="gap:10px"><span class="label">Entrenamiento de hoy</span>${boardThumbs(bs,true)}
+    <p class="small muted" style="text-align:center;margin-top:-2px">Toca la foto para verla en grande o borrarla.</p>
+    ${b('manana','Asistencia de mañana')}${b('tarde','Asistencia de tarde')}
+    <label class="linkbtn" for="home-board2">📷 Añadir foto de otra pizarra</label><input id="home-board2" class="board-in" type="file" accept="image/*" data-date="${t}" hidden></div>`;
+}
+let attReturn=null;
 function trainingDay(ds){
   const bs=boardsOn(ds),plan=plansOn(ds)[0],nm=attOf(ds,'manana').length,nt=attOf(ds,'tarde').length;
   const title=ds===today()?'Entrenamiento de hoy':capFirst(fmtDate(ds,{weekday:'long',day:'numeric',month:'long'}));
@@ -765,7 +778,7 @@ async function saveAtt(ds,sh,ex){
       delete d.id;ok=(await save('sessions',x?x.id:uid(),d))&&ok}
     else if(x)ok=(await remove('sessions',x.id))&&ok;
   }
-  if(ok){toast(n?`Asistencia guardada: ${n} ${n===1?'persona':'personas'}`:'Asistencia guardada');attMenu(ds)}
+  if(ok){toast(n?`Asistencia guardada: ${n} ${n===1?'persona':'personas'}`:'Asistencia guardada');if(attReturn)attReturn();else{closeSheet();render()}}
 }
 
 /* peso: historial con fecha, objetivo y gráfica */
@@ -786,15 +799,13 @@ async function migrateWeights(){
   }
 }
 function weightPanel(c){
-  const ws_=weightsOf(c.id),cur=curWeight(c),goal=c.goalWeight,first=ws_[0];
-  const left=cur!=null&&goal!=null?Math.round((cur-goal)*10)/10:null;
+  const ws_=weightsOf(c.id),cur=curWeight(c),first=ws_[0];
   const diff=first&&ws_.length>1?Math.round((cur-first.weight)*10)/10:null;
   return `<div class="card"><div class="wstat">
      <div><span class="label">Peso actual</span><b class="num">${cur!=null?fmtKg(cur)+' kg':'—'}</b><span class="small muted">${ws_.length?esc(fmtDate(ws_[ws_.length-1].date)):'Sin registros'}</span></div>
-     <div><span class="label">Objetivo</span><b class="num">${goal!=null?fmtKg(goal)+' kg':'—'}</b><span class="small ${left!=null&&left<=0?'':'muted'}">${left==null?'':left>0?'Le quedan '+fmtKg(left)+' kg':left<0?'Por debajo: '+fmtKg(-left)+' kg':'¡Conseguido!'}</span></div></div>
+     <div><span class="label">Primer registro</span><b class="num">${first?fmtKg(first.weight)+' kg':'—'}</b><span class="small muted">${first?esc(fmtDate(first.date)):''}</span></div></div>
      ${diff!=null?`<p class="small" style="margin-top:8px">Desde el ${esc(fmtDate(first.date))}: <b>${diff<0?'ha bajado '+fmtKg(-diff):diff>0?'ha subido '+fmtKg(diff):'sin cambios,'} ${diff?'kg':''}</b></p>`:''}</div>
-   <button class="btn btn-primary btn-big" data-act="new-weight" data-id="${esc(c.id)}">${ic('plus')} Apuntar peso de hoy</button>
-   <div class="grid2"><button class="btn btn-big" data-act="weight-chart" data-id="${esc(c.id)}">📈 Ver gráfica</button><button class="btn btn-big" data-act="edit-goal" data-id="${esc(c.id)}">🎯 ${goal!=null?'Cambiar objetivo':'Poner objetivo'}</button></div>`;
+   <div class="grid2"><button class="btn btn-primary btn-big" data-act="new-weight" data-id="${esc(c.id)}">${ic('plus')} Nuevo peso</button><button class="btn btn-big" data-act="weight-chart" data-id="${esc(c.id)}">📈 Ver gráfica</button></div>`;
 }
 function weightForm(cid){
   const c=byId('clients',cid);if(!c)return;const cur=curWeight(c);
@@ -814,7 +825,7 @@ function weightChart(cid){
   const c=byId('clients',cid);if(!c)return;
   const pts=weightsOf(cid).map(m=>({x:m.date,y:+m.weight}));
   openSheet('Evolución del peso',`<p class="muted">${esc(c.name)}</p>
-   ${pts.length>=2?`<div class="card">${lineChart(pts,'kg',c.goalWeight)}</div>`:`<div class="empty">Apunta el peso al menos dos días distintos para ver la gráfica.</div>`}
+   ${pts.length>=2?`<div class="card">${lineChart(pts,'kg')}</div>`:`<div class="empty">Apunta el peso al menos dos días distintos para ver la gráfica.</div>`}
    ${pts.length?`<div class="list">${[...weightsOf(cid)].reverse().map((m,i,a)=>{const prev=a[i+1];const d=prev?Math.round((m.weight-prev.weight)*10)/10:null;
      return `<button type="button" class="card" data-act="edit-measure" data-id="${esc(m.id)}"><span class="row between"><b>${esc(fmtDate(m.date))}</b><span class="num"><b>${fmtKg(m.weight)} kg</b>${d?` <span class="small ${d<0?'':'muted'}">(${d>0?'+':'−'}${fmtKg(Math.abs(d))})</span>`:''}</span></span></button>`}).join('')}</div>`:''}`,
   closeSheet,{saveLabel:'Cerrar',info:true});
@@ -1094,7 +1105,7 @@ document.addEventListener('click',async e=>{
     case 'blk-rm':{const bl=readBlks();bl.splice(+id,1);drawBlks(bl);break}
     case 'dup-routine':{const r=byId('routines',id);const nid=uid();if(await save('routines',nid,{...r,id:undefined,name:r.name+' (copia)',createdAt:Date.now()})){closeSheet();toast('Rutina duplicada');editRoutine(byId('routines',nid)||{...r,id:nid,name:r.name+' (copia)'})}break}
     case 'new-session':trainingDay(today());break;
-    case 'edit-session':{const s=byId('sessions',id);if(!s)break;if(s.shift)attForm(s.date,s.shift);else sessionForm(s.clientId,s);break}
+    case 'edit-session':{const s=byId('sessions',id);if(!s)break;if(s.shift){attReturn=null;attForm(s.date,s.shift)}else sessionForm(s.clientId,s);break}
     case 'pick-session':trainingDay(today());break;
     case 'toggle-pick':{const on=a.getAttribute('aria-pressed')!=='true';a.setAttribute('aria-pressed',String(on));a.querySelector('.tick').textContent=on?'✓':'';pickCount();break}
     case 'pick-go':pickGo();break;
@@ -1116,11 +1127,11 @@ document.addEventListener('click',async e=>{
     case 'log-day':trainingDay(id);break;
     case 'training-day':trainingDay(id);break;
     case 'att-menu':attMenu(id);break;
-    case 'att-shift':{const [d,sh]=id.split('|');attForm(d,sh);break}
+    case 'att-shift':{const [d,sh]=id.split('|');attReturn=()=>attMenu(d);attForm(d,sh);break}
+    case 'att-home':attReturn=null;attForm(today(),id);break;
     case 'att-toggle':{const on=a.getAttribute('aria-pressed')!=='true';a.setAttribute('aria-pressed',String(on));a.querySelector('.tick').textContent=on?'✓':'';const m=a.parentElement.querySelector('.att-more');if(m)m.hidden=!on;break}
     case 'att-score':{const on=a.getAttribute('aria-pressed')!=='true';a.parentElement.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(on&&b===a)));break}
     case 'new-weight':weightForm(id);break;
-    case 'edit-goal':goalForm(id);break;
     case 'weight-chart':weightChart(id);break;
     case 'cal-prev':calMonth=new Date(calMonth.getFullYear(),calMonth.getMonth()-1,1);render();break;
     case 'cal-next':calMonth=new Date(calMonth.getFullYear(),calMonth.getMonth()+1,1);render();break;
