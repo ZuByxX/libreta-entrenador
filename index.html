@@ -248,8 +248,8 @@ const wp=()=>WP().toLowerCase();
 const ws=()=>(CFG&&CFG.wordS)||'cliente';
 const WS=()=>ws().charAt(0).toUpperCase()+ws().slice(1);
 const LEVELS=['Principiante','Intermedio','Avanzado'];
-const COLS=['routines','clients','sessions','measures','plans','exercises','boards','days'];
-const S={routines:[],clients:[],sessions:[],measures:[],plans:[],exercises:[],boards:[],days:[]};
+const COLS=['routines','clients','sessions','measures','plans','exercises','boards','days','challenges'];
+const S={routines:[],clients:[],sessions:[],measures:[],plans:[],exercises:[],boards:[],days:[],challenges:[]};
 const got={}; let db=null, status='loading', slow=false, readOnly=false;
 let clientTab='sesiones', progEx=null, search='', calClient='', cFilter='';
 const SHIFTS=[['manana','Mañana'],['tarde','Tarde']];
@@ -299,7 +299,7 @@ async function init(){
     db.collection(k).onSnapshot(snap=>{
       S[k]=snap.docs.map(d=>({...d.data(),id:d.id}));
       got[k]=true;
-      if(COLS.every(x=>got[x])){status='ready';if(k==='clients'||k==='measures')setTimeout(migrateWeights,0); if(!snap.metadata.fromCache){clearTimeout(t);slow=false}}
+      if(COLS.every(x=>got[x])){status='ready';if(k==='clients'||k==='measures')setTimeout(migrateWeights,0);if(k==='days'||k==='routines'||k==='boards')setTimeout(migrateDays,0); if(!snap.metadata.fromCache){clearTimeout(t);slow=false}}
       schedule();
     },err=>{clearTimeout(t);status='error';render()});
   });
@@ -358,6 +358,7 @@ function vHome(){
   ${backupNag()}${todayPlans()}
   <div class="section">
     ${homeTraining()}
+    <button type="button" class="btn btn-big" data-act="challenge" style="margin-top:6px">🏆 Reto semanal${chOfWeek(weekStart(today()))?' · '+esc(chOfWeek(weekStart(today())).exercise):''}</button>
   </div>
   ${act.length===0?`<div class="section"><div class="help"><h3>Cómo empezar</h3><p>1. En <b>Rutinas</b>, crea tus entrenamientos (AMRAP, EMOM…).</p><p>2. En <b>${WP()}</b>, añade a cada persona con su foto y si viene de mañana o de tarde.</p><p>3. En <b>Calendario</b>, elige qué entrenamiento toca cada día.</p><p>4. Cada día, pulsa <b>Apuntar entrenamiento</b> y haz la foto de la pizarra. Después pasa asistencia de mañana y de tarde.</p></div></div>`:''}
   ${need.length?`<div class="section"><div class="row between"><h2>Llevan más de una semana sin venir</h2></div><div class="list">${need.map(clientCard).join('')}</div></div>`:''}
@@ -386,15 +387,15 @@ function exLine(e){
 
 function vRoutines(){
   const rs=[...S.routines].sort((a,b)=>a.name.localeCompare(b.name));
-  return `<h1>Rutinas</h1><p class="muted" style="margin-top:6px">Tus plantillas de clase. Elige cuál toca cada día desde el Calendario.</p>
+  return `<h1>Rutinas</h1><p class="muted" style="margin-top:6px">Tus entrenamientos. Los que apuntas desde Inicio se guardan aquí solos.</p>
   <div class="section">
     <button class="btn btn-primary btn-big" data-act="new-routine">${ic('plus')} Crear rutina</button>
     <div class="list">${rs.length?rs.map(r=>{const n=S.clients.filter(c=>c.routineId===r.id).length;return `<button class="card" data-act="edit-routine" data-id="${esc(r.id)}">
-      <span class="row between"><h3>${esc(r.name)}</h3><span class="chip acc">${esc(typeLabel(blocksOf(r))||'Sin tipo')}</span></span>
+      <span class="row between" style="gap:10px">${(r.photos||[]).length&&okImg(r.photos[0])?`<img src="${r.photos[0]}" alt="" style="width:52px;height:52px;border-radius:10px;object-fit:cover;flex:none">`:''}<h3 style="flex:1;min-width:0">${esc(r.name)}</h3>${typeLabel(blocksOf(r))?`<span class="chip acc">${esc(typeLabel(blocksOf(r)))}</span>`:''}</span>
       ${r.description?`<span class="small muted">${esc(r.description)}</span>`:''}
       <span style="margin-top:4px">${blocksOf(r).length>1?blocksOf(r).map((b,i)=>`<div class="label" style="margin-top:6px">${esc(b.type)}${b.mins?` · ${esc(b.mins)} min`:''}</div>${(r.exercises||[]).filter(e=>Math.min(+e.block||0,blocksOf(r).length-1)===i).map(exLine).join('')}`).join('')
         :(r.exercises||[]).slice(0,6).map(exLine).join('')+((r.exercises||[]).length>6?`<div class="ex-line">y ${(r.exercises.length-6)} más…</div>`:'')}</span>
-      <span class="small muted">${(r.exercises||[]).length} ejercicios</span></button>`}).join(''):'<div class="empty"><p>Aún no hay rutinas.</p><p>Crea tu primera rutina, por ejemplo "AMRAP piernas".</p></div>'}</div>
+      <span class="row between" style="margin-top:4px"><span class="small muted">${(r.exercises||[]).length?(r.exercises||[]).length+' ejercicios':((r.photos||[]).length?'Con foto de la pizarra':'Sin ejercicios')}</span><span class="small ${lastDone(r)?'':'muted'}">${lastDone(r)?'Última vez: '+esc(ago(lastDone(r)).toLowerCase()):'Aún no la has hecho'}</span></span></button>`}).join(''):'<div class="empty"><p>Aún no hay rutinas.</p><p>Crea tu primera rutina, por ejemplo "AMRAP piernas".</p></div>'}</div>
   </div>`;
 }
 
@@ -731,6 +732,8 @@ async function exportXlsx(btn){
     const wb=X.utils.book_new();
     const add=(rows,name)=>{const ws=X.utils.json_to_sheet(rows.length?rows:[{'(vacío)':''}]);const keys=Object.keys(rows[0]||{'(vacío)':''});ws['!cols']=keys.map(k=>({wch:Math.min(40,Math.max(k.length,...rows.map(r=>String(r[k]??'').length))+2)}));X.utils.book_append_sheet(wb,ws,name)};
     add(alumnos,WP().slice(0,31));add(entrenos,'Entrenamientos');add(calendario,'Calendario');add(rutinas,'Rutinas');add(medidas,'Medidas');
+    const retos=[];[...S.challenges].sort((a,b)=>a.weekStart.localeCompare(b.weekStart)).forEach(c=>{const res=c.results||{};const base={'Semana':c.weekStart,'Ejercicio':c.exercise,'Cómo se mide':chMode(c)};const ks=Object.keys(res);if(!ks.length)retos.push(base);else ks.forEach(k=>retos.push({...base,[WS()]:cname(k),'Repeticiones':res[k].reps??'','Hecho':res[k].done?'Sí':''}))});
+    add(retos,'Retos');
     const buf=X.write(wb,{bookType:'xlsx',type:'array'});
     const fname=`${(CFG&&CFG.appName||'Libreta').replace(/[^\wÀ-ÿ -]/g,'').trim()||'Libreta'} ${today()}.xlsx`;
     const dl=window.LOCAL_CLAUDE?await window.LOCAL_CLAUDE.use('downloads'):null;
@@ -764,6 +767,12 @@ async function addBoard(input){
   let url;try{url=await boardImage(f)}catch(e){toast('No se pudo abrir la foto');return}
   if(await save('boards',uid(),{date:ds,photo:url,createdAt:Date.now()})){toast('Foto de la pizarra guardada');setTimeout(()=>{if(reopen)reopen();else render()},50)}
 }
+function showImage(url,extra){
+  if(!okImg(url))return;
+  document.getElementById('confirm').innerHTML=`<div class="sheet-bg" style="z-index:70;align-items:center;padding:12px;flex-direction:column;gap:12px" data-act="confirm-no" role="dialog" aria-modal="true" aria-label="Foto">
+   <img src="${url}" alt="Foto de la pizarra" style="max-width:100%;max-height:72vh;border-radius:12px;object-fit:contain;background:var(--surface)">
+   <div class="row" style="gap:10px;width:100%;max-width:420px"><button type="button" class="btn btn-big" style="flex:1" data-act="confirm-no">Cerrar</button>${extra||''}</div></div>`;
+}
 function viewBoard(id){
   const b=byId('boards',id);if(!b||!okImg(b.photo))return;
   document.getElementById('confirm').innerHTML=`<div class="sheet-bg" style="z-index:70;align-items:center;padding:12px;flex-direction:column;gap:12px" data-act="confirm-no" role="dialog" aria-modal="true" aria-label="Foto de la pizarra">
@@ -794,26 +803,47 @@ function homeTraining(){
     <label class="linkbtn" for="home-board2">📷 Añadir foto de otra pizarra</label><input id="home-board2" class="board-in" type="file" accept="image/*" data-date="${t}" hidden></div>`;
 }
 let attReturn=null;
+const routineByName=t=>S.routines.find(r=>nameKey(r.name)===nameKey(t));
+function lastDone(r){let m='';const t=today();
+  S.days.forEach(d=>{if(d.routineId===r.id&&d.date<=t&&d.date>m)m=d.date});
+  S.sessions.forEach(x=>{if(x.routineId===r.id&&x.date<=t&&x.date>m)m=x.date});
+  return m}
+async function linkRoutine(ds,title,photo){
+  const d=S.days.find(x=>x.id===ds),old=d&&d.routineId?byId('routines',d.routineId):null;
+  let r=routineByName(title);
+  if(!r&&old&&old.fromDay&&!S.days.some(x=>x.id!==ds&&x.routineId===old.id)){const o={...old,name:title};delete o.id;if(await save('routines',old.id,o))r={...o,id:old.id}}
+  if(!r){const id=uid(),o={name:title,blocks:[{type:'',mins:''}],type:'',description:'',exercises:[],photos:photo?[photo]:[],fromDay:true,createdAt:Date.now()};if(!(await save('routines',id,o)))return null;r={...o,id}}
+  else if(photo&&!(r.photos||[]).length){const o={...r,photos:[photo]};delete o.id;await save('routines',r.id,o)}
+  return r.id;
+}
+let migDaysRunning=false;const migDaysDone=new Set();
+async function migrateDays(){if(migDaysRunning)return;migDaysRunning=true;
+  try{for(const d of [...S.days].sort((a,b)=>a.date.localeCompare(b.date))){if(!d.title||d.routineId||migDaysDone.has(d.id))continue;migDaysDone.add(d.id);
+    const b=boardsOn(d.date)[0];const rid=await linkRoutine(d.date,d.title,b&&okImg(b.photo)?b.photo:null);
+    if(rid){const dd={...d,routineId:rid};delete dd.id;await save('days',d.id,dd)}}}
+  finally{migDaysRunning=false}}
 const dayTitle=ds=>{const d=S.days.find(x=>x.id===ds);return d&&d.title?d.title:''};
 const dayTitleRow=ds=>{const tt=dayTitle(ds);return `<div class="row between" style="gap:8px"><h2 style="margin:0;min-width:0" class="ellip">${tt?esc(tt):'<span class="muted">Sin nombre</span>'}</h2><button type="button" class="btn btn-ghost" style="min-height:40px;flex:none" data-act="day-name" data-id="${ds}">${tt?'Cambiar nombre':'Poner nombre'}</button></div>`};
-async function saveDayTitle(ds,title){
-  const d=S.days.find(x=>x.id===ds);
-  if(!(await save('days',ds,{...(d||{}),date:ds,title,updatedAt:Date.now(),createdAt:d&&d.createdAt||Date.now()})))return false;
-  for(const x of sessionsOn(ds).filter(x=>x.shift&&x.routineName!==title)){const dd={...x,routineName:title};delete dd.id;await save('sessions',x.id,dd)}
+async function saveDayTitle(ds,title,photo){
+  const d=S.days.find(x=>x.id===ds);const rid=await linkRoutine(ds,title,photo);
+  if(!(await save('days',ds,{...(d||{}),date:ds,title,routineId:rid||null,updatedAt:Date.now(),createdAt:d&&d.createdAt||Date.now()})))return false;
+  for(const x of sessionsOn(ds).filter(x=>x.shift&&(x.routineName!==title||x.routineId!==rid))){const dd={...x,routineName:title,routineId:rid||null};delete dd.id;await save('sessions',x.id,dd)}
   return true;
 }
 let newDayPhoto=null;
 function newDayForm(ds){
   newDayPhoto=null;const plan=plansOn(ds)[0];
   openSheet(ds===today()?'Entrenamiento de hoy':capFirst(fmtDate(ds,{weekday:'long',day:'numeric',month:'long'})),`
-   ${field('nd-name','¿Cómo se llama el entrenamiento?',inp('nd-name',dayTitle(ds)||(plan?planTitle(plan):''),'placeholder="Ej.: AMRAP piernas" autocomplete="off"'))}
+   ${field('nd-name','¿Cómo se llama el entrenamiento?',inp('nd-name',dayTitle(ds)||(plan?planTitle(plan):''),'placeholder="Ej.: AMRAP piernas" autocomplete="off" list="nd-routines"'),S.routines.length?'Si ya lo hiciste otro día, elige su nombre y no hará falta repetir la foto.':'')}
+   <datalist id="nd-routines">${S.routines.map(r=>`<option value="${esc(r.name)}">`).join('')}</datalist>
    <div class="field"><span>Foto de la pizarra</span><div id="nd-prev"></div>
      <label class="btn btn-big" for="nd-photo" style="cursor:pointer" id="nd-photo-lbl">📷 Hacer o elegir foto</label><input id="nd-photo" type="file" accept="image/*" hidden></div>
    <button type="submit" class="btn btn-primary btn-big">Guardar entrenamiento</button>`,
   async()=>{
     const name=fv('nd-name');if(!name){toast('Escribe el nombre del entrenamiento');document.getElementById('nd-name').focus();return}
+    const rr=routineByName(name);if(!newDayPhoto&&rr&&(rr.photos||[]).length&&okImg(rr.photos[0]))newDayPhoto=rr.photos[0];
     if(!newDayPhoto){toast('Falta la foto de la pizarra');return}
-    if(!(await saveDayTitle(ds,name)))return;
+    if(!(await saveDayTitle(ds,name,newDayPhoto)))return;
     if(await save('boards',uid(),{date:ds,photo:newDayPhoto,createdAt:Date.now()})){newDayPhoto=null;closeSheet();toast('Entrenamiento guardado');render()}
   },{saveLabel:'Guardar'});
   setTimeout(()=>document.getElementById('nd-name')?.focus(),50);
@@ -897,7 +927,7 @@ async function saveAtt(){
   let ok=true;
   for(const cid of sel){const x=ex.get(cid);
     const d={...(x||{}),clientId:cid,date:ds,shift:sh,duration:'60',score:att.score[cid]||null,notes:att.note[cid]||'',
-      routineId:x?x.routineId||null:(plan&&plan.routineId)||null,routineName:dayTitle(ds)||(x&&x.routineName)||rn,planId:x&&x.planId||(plan&&plan.id)||null,exercises:x&&x.exercises||[],createdAt:x&&x.createdAt||Date.now(),updatedAt:Date.now()};
+      routineId:(S.days.find(y=>y.id===ds)||{}).routineId||(x?x.routineId||null:(plan&&plan.routineId)||null),routineName:dayTitle(ds)||(x&&x.routineName)||rn,planId:x&&x.planId||(plan&&plan.id)||null,exercises:x&&x.exercises||[],createdAt:x&&x.createdAt||Date.now(),updatedAt:Date.now()};
     delete d.id;ok=(await save('sessions',x?x.id:uid(),d))&&ok}
   for(const [cid,x] of ex)if(!sel.has(cid))ok=(await remove('sessions',x.id))&&ok;
   const n=sel.size;
@@ -953,6 +983,79 @@ function weightChart(cid){
      return `<button type="button" class="card" data-act="edit-measure" data-id="${esc(m.id)}"><span class="row between"><b>${esc(fmtDate(m.date))}</b><span class="num"><b>${fmtKg(m.weight)} kg</b>${d?` <span class="small ${d<0?'':'muted'}">(${d>0?'+':'−'}${fmtKg(Math.abs(d))})</span>`:''}</span></span></button>`}).join('')}</div>`:''}`,
   closeSheet,{saveLabel:'Cerrar',info:true});
 }
+
+/* reto semanal */
+const weekStart=ds=>{const d=dt(ds);d.setDate(d.getDate()-((d.getDay()+6)%7));return iso(d)};
+const chOfWeek=w=>S.challenges.find(c=>c.weekStart===w);
+const weekLabel=w=>{const e=dt(w);e.setDate(e.getDate()+6);return 'Semana del '+fmtDate(w,{day:'numeric',month:'short'})+' al '+fmtDate(iso(e),{day:'numeric',month:'short'})};
+const chMode=c=>c.mode==='done'?'Marcar si lo han hecho':'Máximas repeticiones'+(c.time?' en '+c.time:'');
+function chRanking(c,limit){
+  const res=c.results||{},name=cid=>{const k=byId('clients',cid);return k?k.name:'(borrado)'};
+  if(c.mode==='done'){const ids=Object.keys(res).filter(k=>res[k]&&res[k].done);
+    return ids.length?`<p class="small"><b>${ids.length}</b> ${ids.length===1?'persona lo ha hecho':'personas lo han hecho'}</p><div class="row" style="gap:6px;margin-top:6px">${ids.map(k=>`<span class="chip ok">✓ ${esc(name(k).split(' ')[0])}</span>`).join('')}</div>`:'<p class="small muted">Todavía nadie apuntado.</p>'}
+  const list=Object.keys(res).filter(k=>res[k]&&res[k].reps>0).sort((a,b)=>res[b].reps-res[a].reps);
+  if(!list.length)return '<p class="small muted">Todavía nadie apuntado.</p>';
+  const med=['🥇','🥈','🥉'];
+  return `<div class="stack" style="gap:6px;margin-top:6px">${list.slice(0,limit||list.length).map((k,i)=>`<div class="row between"><span>${med[i]||(i+1)+'.'} ${esc(name(k))}</span><b class="num">${res[k].reps}</b></div>`).join('')}${limit&&list.length>limit?`<span class="small muted">y ${list.length-limit} más</span>`:''}</div>`;
+}
+function challengeHome(){
+  const w=weekStart(today()),c=chOfWeek(w),past=S.challenges.filter(x=>x.weekStart<w).sort((a,b)=>b.weekStart.localeCompare(a.weekStart));
+  openSheet('Reto semanal',`
+   <span class="label">${esc(weekLabel(w))}</span>
+   ${c?`<div class="card"><h2 style="margin:0">${esc(c.exercise)}</h2><span class="small muted">${esc(chMode(c))}</span>${c.notes?`<span class="small">${esc(c.notes)}</span>`:''}${chRanking(c,5)}</div>
+     <button type="button" class="btn btn-primary btn-big" data-act="ch-results" data-id="${esc(c.id)}">${c.mode==='done'?'Marcar quién lo ha hecho':'Apuntar repeticiones'}</button>
+     <button type="button" class="btn btn-big" data-act="ch-edit" data-id="${esc(c.id)}">Cambiar el reto</button>`
+    :`<p class="muted">Esta semana aún no hay reto.</p><button type="button" class="btn btn-primary btn-big" data-act="ch-new">${ic('plus')} Crear reto de esta semana</button>`}
+   ${past.length?`<h3 style="margin-top:12px">Semanas anteriores</h3><div class="list">${past.map(x=>`<button type="button" class="card" data-act="ch-open" data-id="${esc(x.id)}"><span class="row between"><b>${esc(x.exercise)}</b><span class="small muted">${esc(fmtDate(x.weekStart,{day:'numeric',month:'short'}))}</span></span><span class="small muted">${esc(chMode(x))}</span>${chRanking(x,3)}</button>`).join('')}</div>`:''}`,
+  closeSheet,{saveLabel:'Cerrar',info:true});
+}
+function challengeView(id){
+  const c=byId('challenges',id);if(!c)return challengeHome();
+  openSheet(c.exercise,`<span class="label">${esc(weekLabel(c.weekStart))}</span><div class="card"><span class="small muted">${esc(chMode(c))}</span>${c.notes?`<span class="small">${esc(c.notes)}</span>`:''}${chRanking(c)}</div>
+   <button type="button" class="btn btn-big" data-act="ch-results" data-id="${esc(c.id)}">${c.mode==='done'?'Cambiar quién lo hizo':'Cambiar repeticiones'}</button>
+   <button type="button" class="btn btn-big" data-act="ch-edit" data-id="${esc(c.id)}">Cambiar el reto</button>
+   <button type="button" class="btn btn-ghost" data-act="challenge">${ic('back')} Volver</button>`,closeSheet,{saveLabel:'Cerrar',info:true});
+}
+let chModeSel='reps';
+function challengeForm(c){
+  chModeSel=c?.mode||'reps';const w=c?.weekStart||weekStart(today());
+  openSheet(c?'Cambiar el reto':'Reto de esta semana',`<span class="label">${esc(weekLabel(w))}</span>
+   ${field('ch-ex','¿Qué ejercicio es?',inp('ch-ex',c?.exercise,'placeholder="Ej.: Burpees" autocomplete="off"'))}
+   <div class="field"><span>¿Cómo se mide?</span><div class="list" id="ch-modes">
+     <button type="button" class="btn btn-big ${chModeSel==='reps'?'btn-primary':''}" data-act="ch-mode" data-id="reps">Máximas repeticiones en un tiempo</button>
+     <button type="button" class="btn btn-big ${chModeSel==='done'?'btn-primary':''}" data-act="ch-mode" data-id="done">Solo marcar si lo han hecho</button></div></div>
+   <div id="ch-time-box" ${chModeSel==='done'?'hidden':''}>${field('ch-time','¿Cuánto tiempo tienen?',inp('ch-time',c?.time,'placeholder="Ej.: 1 minuto" autocomplete="off"'),'Opcional.')}</div>
+   ${field('ch-notes','Notas (opcional)',inp('ch-notes',c?.notes,'placeholder="Ej.: con 10 kg"'))}`,
+  async()=>{const ex=fv('ch-ex');if(!ex){toast('Escribe el ejercicio');document.getElementById('ch-ex').focus();return}
+    const id=c?.id||uid();
+    if(await save('challenges',id,{...(c||{}),weekStart:w,exercise:ex,mode:chModeSel,time:chModeSel==='reps'?fv('ch-time'):'',notes:fv('ch-notes'),results:c?.results||{},createdAt:c?.createdAt||Date.now(),updatedAt:Date.now()})){toast('Reto guardado');if(c&&c.weekStart<weekStart(today()))challengeView(id);else challengeHome()}
+  },c?{del:{label:'Borrar este reto',run:async()=>{if(await remove('challenges',c.id)){toast('Reto borrado');challengeHome()}}}}:{});
+  setTimeout(()=>document.getElementById('ch-ex')?.focus(),50);
+}
+let chState=null;
+function challengeResults(id){
+  const c=byId('challenges',id);if(!c)return;const res=c.results||{};
+  chState={id,q:'',f:''};
+  const people=S.clients.filter(k=>k.active!==false||res[k.id]).sort(byName);
+  const row=k=>{const r=res[k.id]||{};
+    if(c.mode==='done')return `<button type="button" class="card cli pickp chrow" data-act="ch-toggle" data-cid="${esc(k.id)}" data-name="${esc(nameKey(k.name))}" data-shift="${esc(k.shift||'')}" aria-pressed="${!!r.done}">${avatar(k)}<span class="txt"><span class="name">${esc(k.name)}</span><span class="small muted">${esc(shiftName(k.shift)||'')}</span></span><span class="tick">${r.done?'✓':''}</span></button>`;
+    return `<div class="card cli chrow" data-cid="${esc(k.id)}" data-name="${esc(nameKey(k.name))}" data-shift="${esc(k.shift||'')}">${avatar(k)}<span class="txt"><span class="name">${esc(k.name)}</span><span class="small muted">${esc(shiftName(k.shift)||'')}</span></span><input class="ch-reps" type="text" inputmode="numeric" value="${r.reps??''}" placeholder="Reps" aria-label="Repeticiones de ${esc(k.name)}" style="width:84px;text-align:center;font-weight:700;font-size:1.1rem;flex:none"></div>`};
+  openSheet(c.exercise,`<p class="muted">${esc(chMode(c))}. ${c.mode==='done'?'Toca a quien lo haya hecho.':'Escribe las repeticiones de cada uno. Deja vacío a quien no lo haya hecho.'}</p>
+   ${people.length?`<input id="ch-q" type="search" placeholder="Buscar por nombre" autocomplete="off">${segFilter('chf','')}<div class="list" id="ch-list">${people.map(row).join('')}</div><p class="empty" id="ch-none" style="display:none">Nadie con ese nombre en este filtro.</p>`
+     :`<div class="empty">Todavía no tienes ${wp()}.</div>`}
+   <button type="submit" class="btn btn-primary btn-big">Guardar</button>`,
+  async()=>{const out={};
+    document.querySelectorAll('#ch-list .chrow').forEach(el=>{const cid=el.dataset.cid;
+      if(c.mode==='done'){if(el.getAttribute('aria-pressed')==='true')out[cid]={done:true}}
+      else{const v=parseInt((el.querySelector('.ch-reps').value||'').replace(/\D/g,''),10);if(v>0)out[cid]={reps:v}}});
+    const d={...c,results:out,updatedAt:Date.now()};delete d.id;
+    if(await save('challenges',c.id,d)){toast('Resultados guardados');if(c.weekStart<weekStart(today()))challengeView(c.id);else challengeHome()}
+  },{saveLabel:'Guardar'});
+}
+function chFilter(){if(!chState)return;const q=nameKey(chState.q);let n=0;
+  document.querySelectorAll('#ch-list .chrow').forEach(b=>{const sh=b.dataset.shift;const show=(!q||b.dataset.name.includes(q))&&(!chState.f||sh===chState.f||sh==='ambos');b.hidden=!show;if(show)n++});
+  const none=document.getElementById('ch-none');if(none)none.style.display=n>0?'none':''}
+document.addEventListener('input',e=>{if(e.target.id!=='ch-q'||!chState)return;chState.q=e.target.value;chFilter()});
 
 /* copia de seguridad local */
 const LB_KEY='libreta-ultima-copia';
@@ -1127,14 +1230,19 @@ function routineForm(d){
      <div class="row between"><h3>${bl.length>1?`Parte ${i+1} · `:''}${esc(b.type)}</h3>${b.mins?`<span class="chip">${esc(b.mins)} min</span>`:''}</div>
      <div class="stack" id="rows-${i}" data-rows="${i}">${rowsBlock(ex.filter(e=>Math.min(+e.block||0,bl.length-1)===i),'routine')}</div>
      ${addBtns('routine','rows-'+i)}</div>`).join('')}
+   <div class="stack"><h3>Foto de la pizarra</h3><div id="r-photos">${routinePhotosHtml()}</div></div>
    ${isNew?photoBox('routine'):''}
    ${field('r-desc','Descripción (opcional)',inp('r-desc',d.description,'placeholder="Ej.: 3 rondas, descanso libre"'))}
    ${!isNew?`<button type="button" class="btn btn-big" data-act="dup-routine" data-id="${esc(d.id)}">Duplicar esta rutina</button>`:''}`,
   async()=>{
     const id=d.id||uid(),exs=readRows();
-    if(await save('routines',id,{name:d.name,blocks:bl,type:typeLabel(bl),description:fv('r-desc'),exercises:exs,createdAt:d.createdAt||Date.now()})){closeSheet();toast(isNew?'Rutina creada':'Rutina guardada');rememberExercises(exs)}
+    if(await save('routines',id,{name:d.name,blocks:bl,type:typeLabel(bl),description:fv('r-desc'),exercises:exs,photos:(rDraft.photos||[]).filter(okImg),fromDay:!!d.fromDay,createdAt:d.createdAt||Date.now()})){closeSheet();toast(isNew?'Rutina creada':'Rutina guardada');rememberExercises(exs)}
   },!isNew?{del:{label:'Borrar rutina',run:async()=>{if(await remove('routines',d.id)){closeSheet();toast('Rutina borrada')}}}}:{});
 }
+function routinePhotosHtml(){const ph=(rDraft&&rDraft.photos)||[];
+  return `${ph.length?`<div class="boards">${ph.map((u,i)=>`<button type="button" data-act="r-photo-view" data-id="${i}" aria-label="Ver foto">${okImg(u)?`<img src="${u}" alt="">`:''}</button>`).join('')}</div>`:''}
+   <label class="btn btn-big" for="r-photo-in" style="cursor:pointer;margin-top:${ph.length?8:0}px">📷 ${ph.length?'Añadir otra foto':'Añadir foto de la pizarra'}</label><input id="r-photo-in" type="file" accept="image/*" hidden>`}
+const drawRoutinePhotos=()=>{const el=document.getElementById('r-photos');if(el)el.innerHTML=routinePhotosHtml()};
 const editRoutine=r=>routineForm({...r,isNew:false,blocks:blocksOf(r).map(b=>({...b})),exercises:(r.exercises||[]).map(e=>({...e}))});
 
 /* sesión */
@@ -1263,7 +1371,7 @@ document.addEventListener('click',async e=>{
     case 'r-step1':{rDraft.exercises=readRows();rDraft.description=fv('r-desc');closeSheet();routineStart(rDraft);break}
     case 'blk-add':{const bl=readBlks();bl.push({type:'',mins:''});drawBlks(bl);break}
     case 'blk-rm':{const bl=readBlks();bl.splice(+id,1);drawBlks(bl);break}
-    case 'dup-routine':{const r=byId('routines',id);const nid=uid();if(await save('routines',nid,{...r,id:undefined,name:r.name+' (copia)',createdAt:Date.now()})){closeSheet();toast('Rutina duplicada');editRoutine(byId('routines',nid)||{...r,id:nid,name:r.name+' (copia)'})}break}
+    case 'dup-routine':{const r=byId('routines',id);const nid=uid();if(await save('routines',nid,{...r,id:undefined,name:r.name+' (copia)',fromDay:false,createdAt:Date.now()})){closeSheet();toast('Rutina duplicada');editRoutine(byId('routines',nid)||{...r,id:nid,name:r.name+' (copia)'})}break}
     case 'new-session':trainingDay(today());break;
     case 'edit-session':{const s=byId('sessions',id);if(!s)break;if(s.shift){attReturn=null;attForm(s.date,s.shift)}else sessionForm(s.clientId,s);break}
     case 'pick-session':trainingDay(today());break;
@@ -1291,6 +1399,16 @@ document.addEventListener('click',async e=>{
     case 'att-shift':{const [d,sh]=id.split('|');attReturn=()=>attMenu(d);attForm(d,sh);break}
     case 'att-home':attReturn=null;attForm(today(),id);break;
     case 'new-day':newDayForm(today());break;
+    case 'challenge':challengeHome();break;
+    case 'ch-new':challengeForm(null);break;
+    case 'ch-edit':challengeForm(byId('challenges',id));break;
+    case 'ch-open':challengeView(id);break;
+    case 'ch-results':challengeResults(id);break;
+    case 'ch-mode':{chModeSel=id;document.querySelectorAll('#ch-modes button').forEach(b=>b.classList.toggle('btn-primary',b===a));const tb=document.getElementById('ch-time-box');if(tb)tb.hidden=id==='done';break}
+    case 'ch-toggle':{const on=a.getAttribute('aria-pressed')!=='true';a.setAttribute('aria-pressed',String(on));a.querySelector('.tick').textContent=on?'✓':'';break}
+    case 'chf':if(chState){chState.f=id;a.parentElement.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b===a)));chFilter()}break;
+    case 'r-photo-view':{const u=(rDraft&&rDraft.photos||[])[+id];showImage(u,`<button type="button" class="btn btn-big" style="flex:1;color:var(--danger)" data-act="r-photo-del" data-id="${id}">Borrar foto</button>`);break}
+    case 'r-photo-del':askConfirm('¿Borrar esta foto?','Se quitará la foto de la pizarra de esta rutina al guardar.','Sí, eliminar',async()=>{if(rDraft&&rDraft.photos){rDraft.photos=rDraft.photos.filter((_,i)=>i!==+id);drawRoutinePhotos()}closeConfirm()});break;
     case 'day-name':dayNameForm(id);break;
     case 'att-toggle':{if(!att)break;const on=a.getAttribute('aria-pressed')!=='true';a.setAttribute('aria-pressed',String(on));a.querySelector('.tick').textContent=on?'✓':'';if(on)att.sel.add(id);else att.sel.delete(id);attCount();break}
     case 'att-back':if(att){attReadRates();attStep1()}break;
@@ -1318,6 +1436,7 @@ document.addEventListener('input',e=>{if(e.target.id==='pk-q'){drawPicker();retu
 });
 document.addEventListener('change',async e=>{
   if(e.target.id==='backup-in'||e.target.id==='w-backup-in'){backupLoad(e.target);return}
+  if(e.target.id==='r-photo-in'){const f=e.target.files&&e.target.files[0];e.target.value='';if(!f||!rDraft)return;try{const u=await boardImage(f);rDraft.photos=[...(rDraft.photos||[]),u];drawRoutinePhotos();toast('Foto añadida. Pulsa Guardar.')}catch(err){toast('No se pudo abrir la foto')}return}
   if(e.target.id==='nd-photo'){newDayPick(e.target);return}
   if(e.target.classList&&e.target.classList.contains('board-in')){addBoard(e.target);return}
   if(e.target.id==='f-photo-in'||e.target.id==='prof-photo'){const f=e.target.files&&e.target.files[0];if(!f)return;
