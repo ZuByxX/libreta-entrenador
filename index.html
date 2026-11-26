@@ -70,6 +70,10 @@ button.card:active{background:var(--surface-2)}
 .chip.ok{background:var(--ok-soft);color:var(--ok)}
 .chip.warn{background:var(--warn-soft);color:var(--warn)}
 .chip.acc{background:var(--accent-soft);color:var(--accent)}
+.boards{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.boards button{padding:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;aspect-ratio:1;background:var(--surface-2);cursor:pointer}
+.boards img{width:100%;height:100%;object-fit:cover;display:block}
+.day .cam{font-size:.6rem;line-height:1}
 .avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;display:block}
 .avatar{overflow:hidden;width:46px;height:46px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-family:var(--f-display);font-weight:700;font-size:1.2rem;flex:none}
 .cli{flex-direction:row;align-items:center;gap:14px}
@@ -233,8 +237,8 @@ const wp=()=>WP().toLowerCase();
 const ws=()=>(CFG&&CFG.wordS)||'cliente';
 const WS=()=>ws().charAt(0).toUpperCase()+ws().slice(1);
 const LEVELS=['Principiante','Intermedio','Avanzado'];
-const COLS=['routines','clients','sessions','measures','plans','exercises'];
-const S={routines:[],clients:[],sessions:[],measures:[],plans:[],exercises:[]};
+const COLS=['routines','clients','sessions','measures','plans','exercises','boards'];
+const S={routines:[],clients:[],sessions:[],measures:[],plans:[],exercises:[],boards:[]};
 const got={}; let db=null, status='loading', slow=false, readOnly=false;
 let clientTab='sesiones', progEx=null, search='', calClient='', cFilter='';
 const SHIFTS=[['manana','Mañana'],['tarde','Tarde']];
@@ -344,6 +348,7 @@ function vHome(){
   <div class="section">
     <button class="btn btn-primary btn-big" data-act="pick-session">${ic('plus')} Apuntar entrenamiento</button>
     <button class="btn btn-big" data-act="new-client">${ic('users')} Añadir ${ws()} nuevo</button>
+    ${boardBtn(today(),'Foto de la pizarra de hoy')}
   </div>
   ${act.length===0?`<div class="section"><div class="help"><h3>Cómo empezar</h3><p>1. En <b>Rutinas</b>, crea tus entrenamientos (AMRAP, EMOM…).</p><p>2. En <b>${WP()}</b>, añade a cada persona con su foto y si viene de mañana o de tarde.</p><p>3. En <b>Calendario</b>, elige qué entrenamiento toca cada día.</p><p>4. Después de cada clase, pulsa <b>Apuntar entrenamiento</b> y marca a todos los que han venido.</p></div></div>`:''}
   ${need.length?`<div class="section"><div class="row between"><h2>Llevan más de una semana sin venir</h2></div><div class="list">${need.map(clientCard).join('')}</div></div>`:''}
@@ -507,7 +512,7 @@ function vCalendar(){
   for(let d=1;d<=days;d++){
     const ds=iso(new Date(y,m,d)),cs=classesOn(ds),ps=plansOn(ds).filter(p=>!S.sessions.some(s=>s.planId===p.id));
     const dots=cs.slice(0,4).map(()=>'<i class="dot"></i>').join('')+ps.slice(0,4).map(()=>`<i class="dot ${ds<t?'miss':'plan'}"></i>`).join('');
-    cells+=`<button class="day ${ds<t?'past':''} ${ds===t?'today':''}" data-act="open-day" data-id="${ds}" aria-label="${esc(fmtDate(ds,{day:'numeric',month:'long'}))}"><span class="num">${d}</span><span class="dots">${dots}</span></button>`;
+    cells+=`<button class="day ${ds<t?'past':''} ${ds===t?'today':''}" data-act="open-day" data-id="${ds}" aria-label="${esc(fmtDate(ds,{day:'numeric',month:'long'}))}"><span class="num">${d}</span><span class="dots">${dots}${boardsOn(ds).length?'<span class="cam" aria-label="Foto de la pizarra">📷</span>':''}</span></button>`;
   }
   const mName=(m=>m.charAt(0).toUpperCase()+m.slice(1))(calMonth.toLocaleDateString('es-ES',{month:'long'}))+' '+y;
   return `<h1>Calendario</h1><p class="muted" style="margin-top:6px">Toca un día: si ya pasó verás qué clases se hicieron; si aún no ha llegado podrás planificar qué entrenamiento toca.</p>
@@ -519,6 +524,7 @@ function vCalendar(){
   </div>`;
 }
 function openDay(ds){
+  dayOpen=ds;
   const t=today(), cs=classesOn(ds), ps=plansOn(ds);
   const title=fmtDate(ds,{weekday:'long',day:'numeric',month:'long'});
   let html='';
@@ -526,6 +532,7 @@ function openDay(ds){
   if(ps.length||ds>=t)html+=`<div class="stack"><span class="label">Planificado</span>${ps.length?`<div class="list">${ps.map(planCard).join('')}</div>`:'<div class="empty">Nada planificado todavía.</div>'}</div>`;
   html+=ds>=t?`<button type="button" class="btn btn-primary btn-big" data-act="new-plan" data-id="${ds}">${ic('plus')} Planificar entrenamiento</button>`:'';
   if(ds<=t)html+=`<button type="button" class="btn btn-big" data-act="log-day" data-id="${ds}">${ic('plus')} Apuntar una clase de este día</button>`;
+  html+=boardSection(ds);
   openSheet(title.charAt(0).toUpperCase()+title.slice(1),html,closeSheet,{saveLabel:'Cerrar',info:true});
 }
 function planForm(ds,p){
@@ -605,7 +612,7 @@ function openSheet(title,html,onSubmit,{saveLabel='Guardar',del=null,info=false,
   sheetDel=del;document.body.style.overflow='hidden';
 }
 let sheetDel=null;
-function closeSheet(){document.getElementById('sheet').innerHTML='';document.body.style.overflow='';sheetSubmit=null;sheetDel=null}
+function closeSheet(){dayOpen=null;document.getElementById('sheet').innerHTML='';document.body.style.overflow='';sheetSubmit=null;sheetDel=null}
 const fv=id=>{const el=document.getElementById(id);return el?el.value.trim():''};
 const field=(id,label,input,hint='')=>`<label class="field" for="${id}"><span>${label}</span>${input}${hint?`<small>${hint}</small>`:''}</label>`;
 const inp=(id,val='',attrs='')=>`<input id="${id}" value="${esc(val)}" ${attrs}>`;
@@ -720,6 +727,35 @@ async function exportXlsx(btn){
   }catch(e){
     say(e&&e.code==='declined'?'Descarga cancelada.':e&&e.code==='host_unavailable'?'Esta app no puede guardar archivos. Ábrela en Safari o en un ordenador.':'No se pudo preparar el archivo. Revisa la conexión e inténtalo otra vez.');
   }finally{btn.disabled=false;btn.textContent=label}
+}
+
+/* fotos de la pizarra (solo se guardan como imagen) */
+const boardsOn=ds=>S.boards.filter(b=>b.date===ds).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+const okImg=u=>typeof u==='string'&&/^data:image\/(jpeg|png|webp);base64,/.test(u);
+let boardSeq=0;
+function boardBtn(ds,label){const k='board-in-'+(++boardSeq);return `<label class="btn btn-big" for="${k}" style="cursor:pointer">📷 ${esc(label)}</label><input id="${k}" class="board-in" type="file" accept="image/*" data-date="${esc(ds)}" hidden>`}
+function boardSection(ds){
+  const bs=boardsOn(ds);
+  return `<div class="stack"><span class="label">Pizarra</span>${bs.length?`<div class="boards">${bs.map(b=>`<button type="button" data-act="board-view" data-id="${esc(b.id)}" aria-label="Ver foto de la pizarra">${okImg(b.photo)?`<img src="${b.photo}" alt="">`:''}</button>`).join('')}</div>`:'<p class="small muted">Haz una foto a la pizarra para guardar el entrenamiento de este día.</p>'}
+   ${boardBtn(ds,bs.length?'Añadir otra foto':'Foto de la pizarra')}</div>`;
+}
+async function boardImage(file){
+  const bmp=await createImageBitmap(file);const M=1400,k=Math.min(1,M/Math.max(bmp.width,bmp.height));
+  const cv=document.createElement('canvas');cv.width=Math.round(bmp.width*k);cv.height=Math.round(bmp.height*k);
+  cv.getContext('2d').drawImage(bmp,0,0,cv.width,cv.height);return cv.toDataURL('image/jpeg',.72);
+}
+let dayOpen=null;
+async function addBoard(input){
+  const f=input.files&&input.files[0];const ds=input.dataset.date;input.value='';if(!f||!ds)return;
+  toast('Guardando foto…');
+  let url;try{url=await boardImage(f)}catch(e){toast('No se pudo abrir la foto');return}
+  if(await save('boards',uid(),{date:ds,photo:url,createdAt:Date.now()})){toast('Foto de la pizarra guardada');setTimeout(()=>{if(dayOpen===ds)openDay(ds);else render()},50)}
+}
+function viewBoard(id){
+  const b=byId('boards',id);if(!b||!okImg(b.photo))return;
+  document.getElementById('confirm').innerHTML=`<div class="sheet-bg" style="z-index:70;align-items:center;padding:12px;flex-direction:column;gap:12px" data-act="confirm-no" role="dialog" aria-modal="true" aria-label="Foto de la pizarra">
+   <img src="${b.photo}" alt="Foto de la pizarra" style="max-width:100%;max-height:72vh;border-radius:12px;object-fit:contain;background:var(--surface)">
+   <div class="row" style="gap:10px;width:100%;max-width:420px"><button type="button" class="btn btn-big" style="flex:1" data-act="confirm-no">Cerrar</button><button type="button" class="btn btn-big" style="flex:1;color:var(--danger)" data-act="board-del" data-id="${esc(b.id)}">Borrar foto</button></div></div>`;
 }
 
 /* copia de seguridad local */
@@ -1040,6 +1076,8 @@ document.addEventListener('click',async e=>{
     case 'cfilter':cFilter=id;render();break;
     case 'export-xlsx':exportXlsx(a);break;
     case 'backup-save':backupSave(a);break;
+    case 'board-view':viewBoard(id);break;
+    case 'board-del':{const b=byId('boards',id);if(b)askConfirm('¿Borrar esta foto?','Se borrará la foto de la pizarra de este día. No se puede deshacer.','Sí, eliminar',async()=>{if(await remove('boards',id)){closeConfirm();toast('Foto borrada');if(dayOpen===b.date)openDay(b.date);else render()}});break}
     case 'del-client':{const c=byId('clients',id);if(c)askConfirm('¿Eliminar a '+c.name+'?','¿Seguro que quieres eliminar a '+c.name+'? Se borrarán también todos sus entrenamientos y medidas. No se puede deshacer.','Sí, eliminar',()=>deleteClient(c));break}
     case 'confirm-yes':{a.disabled=true;a.textContent=a.dataset.busy||'Un momento…';confirmFn&&await confirmFn();break}
     case 'confirm-no':closeConfirm();break;
@@ -1072,6 +1110,7 @@ document.addEventListener('input',e=>{if(e.target.id==='pk-q'){drawPicker();retu
 });
 document.addEventListener('change',async e=>{
   if(e.target.id==='backup-in'||e.target.id==='w-backup-in'){backupLoad(e.target);return}
+  if(e.target.classList&&e.target.classList.contains('board-in')){addBoard(e.target);return}
   if(e.target.id==='f-photo-in'||e.target.id==='prof-photo'){const f=e.target.files&&e.target.files[0];if(!f)return;
     let url;try{url=await photoThumb(f)}catch(err){toast('No se pudo abrir la foto');return}
     if(e.target.id==='f-photo-in'){document.getElementById('f-photo').value=url;document.getElementById('f-photo-prev').innerHTML=avatar({name:fv('f-name')||'?',photo:url},72);e.target.previousElementSibling&&0}
