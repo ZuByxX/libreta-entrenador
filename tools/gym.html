@@ -102,7 +102,8 @@ button.card:active{background:var(--surface-2)}
 
 /* Barra inferior */
 nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);display:flex;justify-content:center;padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
-nav.tabs[hidden]{display:none}
+nav.tabs[hidden]{display:none!important}
+[hidden]{display:none!important}
 nav.tabs .in{display:flex;width:100%;max-width:760px}
 .tab{flex:1;height:var(--tab-h);border:0;background:none;color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:.82rem;font-weight:600}
 .tab[aria-current="page"]{color:var(--accent)}
@@ -200,7 +201,7 @@ const SHIFTS=[['manana','Mañana'],['tarde','Tarde']];
 const shiftName=v=>v==='ambos'?'Mañana y tarde':(SHIFTS.find(x=>x[0]===v)||[])[1]||'';
 const inShift=(c,f)=>!f||c.shift===f||c.shift==='ambos';
 const segFilter=(act,cur)=>`<div class="seg" role="group" aria-label="Filtrar por horario">${[['','Todos'],...SHIFTS].map(([v,l])=>`<button type="button" data-act="${act}" data-id="${v}" aria-pressed="${cur===v}">${l}</button>`).join('')}</div>`;
-const clientsFiltered=()=>S.clients.filter(c=>(!search||c.name.toLowerCase().includes(search.toLowerCase()))&&inShift(c,cFilter)).sort((a,b)=>(a.active===false)-(b.active===false)||a.name.localeCompare(b.name,'es'));
+const clientsFiltered=()=>S.clients.filter(c=>(!search||nameKey(c.name).includes(nameKey(search)))&&inShift(c,cFilter)).sort((a,b)=>(a.active===false)-(b.active===false)||a.name.localeCompare(b.name,'es'));
 let calMonth=(()=>{const d=new Date();return new Date(d.getFullYear(),d.getMonth(),1)})();
 const iso=d=>{const x=new Date(d);x.setMinutes(x.getMinutes()-x.getTimezoneOffset());return x.toISOString().slice(0,10)};
 const plansOn=(date)=>S.plans.filter(p=>p.date===date).sort((a,b)=>(a.time||'99').localeCompare(b.time||'99'));
@@ -316,7 +317,7 @@ function vClients(){
   <div class="section" style="margin-top:16px">
     <button class="btn btn-primary btn-big" data-act="new-client">${ic('plus')} Añadir ${ws()}</button>
     ${S.clients.length?`<div class="stack" style="gap:8px"><span class="label">Filtros</span>${segFilter('cfilter',cFilter)}</div>`:''}
-    ${S.clients.length>4?`<input id="q" type="search" placeholder="Buscar por nombre" value="${esc(search)}" autocomplete="off">`:''}
+    ${S.clients.length?`<input id="q" type="search" placeholder="Buscar por nombre" value="${esc(search)}" autocomplete="off">`:''}
     <div class="list" id="clist">${list.length?list.map(clientCard).join(''):S.clients.length?'<div class="empty">No hay nadie con este filtro.</div>':`<div class="empty"><p>Todavía no hay ${wp()}.</p><p>Pulsa <b>Añadir ${ws()}</b> para crear el primero.</p></div>`}</div>
   </div>`;
 }
@@ -793,12 +794,12 @@ let att=null;
 const nameKey=t=>String(t||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 function attForm(ds,sh){
   const ex=new Map(attOf(ds,sh).map(x=>[x.clientId,x]));
-  att={ds,sh,ex,sel:new Set(ex.keys()),score:{},note:{}};
+  att={ds,sh,ex,sel:new Set(ex.keys()),score:{},note:{},f:sh,q:''};
   ex.forEach((x,cid)=>{att.score[cid]=x.score||null;att.note[cid]=x.notes||''});
   attStep1();
 }
 function attPeople(){
-  const people=S.clients.filter(c=>c.active!==false&&inShift(c,att.sh)).sort(byName);
+  const people=S.clients.filter(c=>c.active!==false).sort(byName);
   att.ex.forEach((x,cid)=>{if(!people.some(c=>c.id===cid)){const c=byId('clients',cid);if(c)people.push(c)}});
   return people;
 }
@@ -806,12 +807,12 @@ const attLbl=()=>att.sh==='manana'?'mañana':'tarde';
 function attStep1(){
   const people=attPeople();
   openSheet('Asistencia de '+attLbl(),`<p class="muted">Paso 1 de 2 · Toca a las personas que han venido.</p>
-   ${people.length>5?`<input id="att-q" type="search" placeholder="Buscar por nombre" autocomplete="off">`:''}
-   ${people.length?`<div class="list" id="att-list">${people.map(c=>{const on=att.sel.has(c.id);return `<button type="button" class="card cli pickp" data-act="att-toggle" data-id="${esc(c.id)}" data-name="${esc(nameKey(c.name))}" aria-pressed="${on}">${avatar(c)}<span class="txt"><span class="name">${esc(c.name)}</span>${c.injuries?`<span class="small muted ellip">⚠︎ ${esc(c.injuries)}</span>`:''}</span><span class="tick">${on?'✓':''}</span></button>`}).join('')}</div><p class="empty" id="att-none" style="display:none">Nadie con ese nombre.</p>`
-     :`<div class="empty">No tienes ${wp()} de ${attLbl()}. Añádelos en la pestaña ${WP()}.</div>`}
+   ${people.length?`<input id="att-q" type="search" placeholder="Buscar por nombre" autocomplete="off" value="${esc(att.q)}">${segFilter('attf',att.f)}`:''}
+   ${people.length?`<div class="list" id="att-list">${people.map(c=>{const on=att.sel.has(c.id);return `<button type="button" class="card cli pickp" data-act="att-toggle" data-id="${esc(c.id)}" data-name="${esc(nameKey(c.name))}" data-shift="${esc(c.shift||'')}" aria-pressed="${on}">${avatar(c)}<span class="txt"><span class="name">${esc(c.name)}</span><span class="small muted ellip">${esc(shiftName(c.shift)||'')}${c.injuries?' · ⚠︎ '+esc(c.injuries):''}</span></span><span class="tick">${on?'✓':''}</span></button>`}).join('')}</div><p class="empty" id="att-none" style="display:none">Nadie con ese nombre.</p>`
+     :`<div class="empty">Todavía no tienes ${wp()}. Añádelos en la pestaña ${WP()}.</div>`}
    <button type="submit" class="btn btn-primary btn-big" id="att-next">Siguiente</button>`,
   ()=>{if(!att.sel.size){if(att.ex.size){saveAtt();return}toast('Marca a las personas que han venido');return}attStep2()},{saveLabel:'Siguiente',noTop:true});
-  attCount();
+  attCount();attFilter();
 }
 function attCount(){const b=document.getElementById('att-next');if(b)b.textContent=att.sel.size?`Siguiente (${att.sel.size})`:(att.ex.size?'Guardar: no ha venido nadie':'Siguiente')}
 function attStep2(){
@@ -825,9 +826,10 @@ function attStep2(){
   ()=>{attReadRates();saveAtt()},{saveLabel:'Guardar'});
 }
 function attReadRates(){document.querySelectorAll('#sheet .att-rate').forEach(el=>{const cid=el.dataset.cid,sc=el.querySelector('[data-act=att-score][aria-pressed="true"]');att.score[cid]=sc?+sc.dataset.id:null;att.note[cid]=el.querySelector('.att-note').value.trim()})}
-document.addEventListener('input',e=>{if(e.target.id!=='att-q')return;const q=nameKey(e.target.value);let n=0;
-  document.querySelectorAll('#att-list [data-act=att-toggle]').forEach(b=>{const show=!q||b.dataset.name.includes(q);b.hidden=!show;if(show)n++});
-  const none=document.getElementById('att-none');if(none)none.style.display=n>0?'none':''});
+function attFilter(){if(!att)return;const q=nameKey(att.q);let n=0;
+  document.querySelectorAll('#att-list [data-act=att-toggle]').forEach(b=>{const sh=b.dataset.shift;const show=(!q||b.dataset.name.includes(q))&&(!att.f||sh===att.f||sh==='ambos');b.hidden=!show;if(show)n++});
+  const none=document.getElementById('att-none');if(none){none.style.display=n>0?'none':'';none.textContent=q?'Nadie con ese nombre en este filtro.':'No hay nadie en este horario.'}}
+document.addEventListener('input',e=>{if(e.target.id!=='att-q'||!att)return;att.q=e.target.value;attFilter()});
 async function saveAtt(){
   const {ds,sh,ex,sel}=att;
   const plan=plansOn(ds)[0],rn=dayTitle(ds)||(plan?planTitle(plan):'Clase de '+(sh==='manana'?'mañana':'tarde'));
@@ -1193,6 +1195,7 @@ document.addEventListener('click',async e=>{
     case 'day-name':dayNameForm(id);break;
     case 'att-toggle':{if(!att)break;const on=a.getAttribute('aria-pressed')!=='true';a.setAttribute('aria-pressed',String(on));a.querySelector('.tick').textContent=on?'✓':'';if(on)att.sel.add(id);else att.sel.delete(id);attCount();break}
     case 'att-back':if(att){attReadRates();attStep1()}break;
+    case 'attf':if(att){att.f=id;a.parentElement.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b===a)));attFilter()}break;
     case 'att-score':{const on=a.getAttribute('aria-pressed')!=='true';a.parentElement.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(on&&b===a)));break}
     case 'new-weight':weightForm(id);break;
     case 'weight-chart':weightChart(id);break;
