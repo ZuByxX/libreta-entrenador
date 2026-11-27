@@ -284,8 +284,14 @@ function clientCard(c){
   const d=ls?daysSince(ls.date):null;
   const chip=!ls?'<span class="chip warn">Sin sesiones</span>':d>7?`<span class="chip warn">${esc(ago(ls.date))}</span>`:`<span class="chip ok">${esc(ago(ls.date))}</span>`;
   return `<button class="card cli" data-go="cliente-${esc(c.id)}">${avatar(c)}
-    <span class="txt"><span class="name ellip">${esc(c.name)}</span><span class="small muted ellip">${esc(shiftName(c.shift)||'Sin horario')}${ls&&ls.routineName?' · Última: '+esc(ls.routineName):''}</span></span>${chip}</button>`;
+    <span class="txt"><span class="name ellip">${esc(c.name)}</span><span class="small muted ellip">${esc(shiftName(c.shift)||'Sin horario')}${ls&&ls.routineName?' · Última: '+esc(ls.routineName):''}</span>${monthAvgLine(c.id)}</span>${chip}</button>`;
 }
+function monthAvg(id){const m=today().slice(0,7);const xs=S.sessions.filter(x=>x.clientId===id&&(x.date||'').startsWith(m)&&x.score>0);
+  return xs.length?{avg:xs.reduce((a,x)=>a+ +x.score,0)/xs.length,n:xs.length}:null}
+const monthName=()=>dt(today()).toLocaleDateString('es-ES',{month:'long'});
+function monthAvgLine(id){const a=monthAvg(id);
+  return a?`<span class="small ellip" title="${a.n} ${a.n===1?'nota':'notas'} en ${monthName()}">⭐ Media del mes: <b>${String(Math.round(a.avg*10)/10).replace('.',',')}</b></span>`
+    :`<span class="small muted ellip">Sin notas este mes</span>`}
 
 function vHome(){
   const act=S.clients.filter(c=>c.active!==false);
