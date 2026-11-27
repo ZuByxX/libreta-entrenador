@@ -17,6 +17,7 @@
 <style>
 /* Layout: app de una columna pensada para iPhone; barra de pestañas fija abajo, tarjetas grandes y tocables. */
 :root{
+  --sc-bg:84%; --sc-fg:24%;
   --bg:#f2f4f7; --surface:#ffffff; --surface-2:#e8ecf2; --fg:#121821; --muted:#5a6575; --line:#d5dbe4;
   --accent:#2343d0; --accent-fg:#ffffff; --accent-soft:#e2e7fd;
   --warn:#a35206; --warn-soft:#fcefd9; --ok:#13744a; --ok-soft:#dcf2e6; --danger:#b42318; --danger-soft:#fde5e2;
@@ -25,10 +26,12 @@
   --r:14px; --tab-h:64px;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --sc-bg:24%; --sc-fg:80%;
   --bg:#0e1218; --surface:#161b24; --surface-2:#1f2531; --fg:#e8ecf3; --muted:#9aa4b4; --line:#2a3240;
   --accent:#8096ff; --accent-fg:#0b1020; --accent-soft:#1e2752;
   --warn:#f0b45a; --warn-soft:#3a2a12; --ok:#5ccb94; --ok-soft:#133325; --danger:#f2806f; --danger-soft:#3d1a16; color-scheme:dark}}
 :root[data-theme="dark"]{
+  --sc-bg:24%; --sc-fg:80%;
   --bg:#0e1218; --surface:#161b24; --surface-2:#1f2531; --fg:#e8ecf3; --muted:#9aa4b4; --line:#2a3240;
   --accent:#8096ff; --accent-fg:#0b1020; --accent-soft:#1e2752;
   --warn:#f0b45a; --warn-soft:#3a2a12; --ok:#5ccb94; --ok-soft:#133325; --danger:#f2806f; --danger-soft:#3d1a16; color-scheme:dark}
@@ -77,6 +80,8 @@ button.card:active{background:var(--surface-2)}
 .wstat{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .wstat div{display:flex;flex-direction:column;gap:2px}
 .wstat b{font-size:1.5rem}
+.chip.score{background:hsl(var(--h) 72% var(--sc-bg));color:hsl(var(--h) 80% var(--sc-fg))}
+.cli .chips{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex:none}
 .boards.one{grid-template-columns:1fr}
 .boards.one button{aspect-ratio:auto;height:170px}
 .linkbtn{background:none;border:0;color:var(--accent);font:inherit;font-weight:600;font-size:.95rem;padding:10px;cursor:pointer;text-align:center;align-self:center}
@@ -339,14 +344,15 @@ function clientCard(c){
   const d=ls?daysSince(ls.date):null;
   const chip=!ls?'<span class="chip warn">Sin sesiones</span>':d>7?`<span class="chip warn">${esc(ago(ls.date))}</span>`:`<span class="chip ok">${esc(ago(ls.date))}</span>`;
   return `<button class="card cli" data-go="cliente-${esc(c.id)}">${avatar(c)}
-    <span class="txt"><span class="name ellip">${esc(c.name)}</span><span class="small muted ellip">${esc(shiftName(c.shift)||'Sin horario')}${ls&&ls.routineName?' · Última: '+esc(ls.routineName):''}</span>${monthAvgLine(c.id)}</span>${chip}</button>`;
+    <span class="txt"><span class="name ellip">${esc(c.name)}</span><span class="small muted ellip">${esc(shiftName(c.shift)||'Sin horario')}</span></span><span class="chips">${chip}${monthAvgChip(c.id)}</span></button>`;
 }
 function monthAvg(id){const m=today().slice(0,7);const xs=S.sessions.filter(x=>x.clientId===id&&(x.date||'').startsWith(m)&&x.score>0);
   return xs.length?{avg:xs.reduce((a,x)=>a+ +x.score,0)/xs.length,n:xs.length}:null}
 const monthName=()=>dt(today()).toLocaleDateString('es-ES',{month:'long'});
-function monthAvgLine(id){const a=monthAvg(id);
-  return a?`<span class="small ellip" title="${a.n} ${a.n===1?'nota':'notas'} en ${monthName()}">⭐ Media del mes: <b>${String(Math.round(a.avg*10)/10).replace('.',',')}</b></span>`
-    :`<span class="small muted ellip">Sin notas este mes</span>`}
+function monthAvgChip(id){const a=monthAvg(id);
+  if(!a)return `<span class="chip" title="Sin notas este mes">Media –</span>`;
+  const v=Math.round(a.avg*10)/10,h=Math.round(Math.max(0,Math.min(10,v))*12);
+  return `<span class="chip score" style="--h:${h}" title="Nota media de ${monthName()} (${a.n} ${a.n===1?'nota':'notas'})">Media ${String(v).replace('.',',')}</span>`}
 
 function vHome(){
   const act=S.clients.filter(c=>c.active!==false);
