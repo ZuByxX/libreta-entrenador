@@ -7,7 +7,7 @@
 <style>
 /* Layout: app de una columna pensada para iPhone; barra de pestañas fija abajo, tarjetas grandes y tocables. */
 :root{
-  --sc-bg:84%; --sc-fg:24%;
+  --sc-bg:84%; --sc-fg:24%; --tc-l:78%; --tcb-l:55%;
   --bg:#f2f4f7; --surface:#ffffff; --surface-2:#e8ecf2; --fg:#121821; --muted:#5a6575; --line:#d5dbe4;
   --accent:#2343d0; --accent-fg:#ffffff; --accent-soft:#e2e7fd;
   --warn:#a35206; --warn-soft:#fcefd9; --ok:#13744a; --ok-soft:#dcf2e6; --danger:#b42318; --danger-soft:#fde5e2;
@@ -16,12 +16,12 @@
   --r:14px; --tab-h:64px;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --sc-bg:24%; --sc-fg:80%;
+  --sc-bg:24%; --sc-fg:80%; --tc-l:30%; --tcb-l:48%;
   --bg:#0e1218; --surface:#161b24; --surface-2:#1f2531; --fg:#e8ecf3; --muted:#9aa4b4; --line:#2a3240;
   --accent:#8096ff; --accent-fg:#0b1020; --accent-soft:#1e2752;
   --warn:#f0b45a; --warn-soft:#3a2a12; --ok:#5ccb94; --ok-soft:#133325; --danger:#f2806f; --danger-soft:#3d1a16; color-scheme:dark}}
 :root[data-theme="dark"]{
-  --sc-bg:24%; --sc-fg:80%;
+  --sc-bg:24%; --sc-fg:80%; --tc-l:30%; --tcb-l:48%;
   --bg:#0e1218; --surface:#161b24; --surface-2:#1f2531; --fg:#e8ecf3; --muted:#9aa4b4; --line:#2a3240;
   --accent:#8096ff; --accent-fg:#0b1020; --accent-soft:#1e2752;
   --warn:#f0b45a; --warn-soft:#3a2a12; --ok:#5ccb94; --ok-soft:#133325; --danger:#f2806f; --danger-soft:#3d1a16; color-scheme:dark}
@@ -139,6 +139,18 @@ textarea{min-height:90px;resize:vertical}
 .day{aspect-ratio:1/1.1;max-width:100%;border:1px solid var(--line);background:var(--surface);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:4px;padding:6px 0 0;color:var(--fg);font-weight:600;font-size:1rem;min-width:0}
 .day.past{background:var(--surface-2);border-color:transparent}
 .day.today{border:2px solid var(--accent);color:var(--accent)}
+.day.typed{background:hsl(var(--th) 78% var(--tc-l));border-color:hsl(var(--th) 60% var(--tcb-l));color:hsl(var(--th) 70% var(--sc-fg))}
+.day.typed2{background:linear-gradient(135deg,hsl(var(--th) 78% var(--tc-l)) 50%,hsl(var(--th2) 78% var(--tc-l)) 50%)}
+.day.typed.planned{background:hsl(var(--th) 78% var(--tc-l) / .38);border:2px dashed hsl(var(--th) 60% var(--tcb-l))}
+.day.typed2.planned{background:linear-gradient(135deg,hsl(var(--th) 78% var(--tc-l) / .38) 50%,hsl(var(--th2) 78% var(--tc-l) / .38) 50%)}
+.day.typed.today{border:3px solid var(--fg)}
+.tsw.planned{background:hsl(var(--th) 78% var(--tc-l) / .38);border:2px dashed hsl(var(--th) 60% var(--tcb-l))}
+.tsw{width:14px;height:14px;border-radius:4px;display:inline-block;flex:none;background:hsl(var(--th) 78% var(--tc-l));border:1px solid hsl(var(--th) 60% var(--tcb-l))}
+.chip.ty{background:hsl(var(--th) 78% var(--tc-l));color:hsl(var(--th) 70% var(--sc-fg))}
+.tpick{display:flex;flex-wrap:wrap;gap:8px}
+.tpick button{min-height:48px;padding:0 14px;border-radius:12px;border:2px solid var(--line);background:var(--surface);color:var(--fg);font:inherit;font-weight:600;font-size:1rem;display:inline-flex;align-items:center;gap:8px;cursor:pointer}
+.tpick button[aria-pressed="true"]{background:hsl(var(--th) 78% var(--tc-l));border-color:hsl(var(--th) 70% var(--sc-fg));color:hsl(var(--th) 70% var(--sc-fg))}
+.tpick button[aria-pressed="true"]::after{content:"✓"}
 .day.blank{visibility:hidden}
 .dots{display:flex;gap:3px;flex-wrap:wrap;justify-content:center;padding:0 2px}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--ok)}
@@ -192,6 +204,20 @@ const DEFAULT_TYPES=['AMRAP','EMOM','For time','Por series','Tabata','Circuito']
 const WORDS={Clientes:'cliente',Alumnos:'alumno',Socios:'socio',Atletas:'atleta',Deportistas:'deportista'};
 let CFG=null, cfgLoaded=false, wiz=null;
 const TYPES_=()=>[...new Set([...DEFAULT_TYPES,...((CFG&&CFG.customTypes)||[])])];
+const TYPE_HUES={'AMRAP':0,'EMOM':212,'For time':28,'Por series':275,'Tabata':130,'Circuito':180};
+const EXTRA_HUES=[325,50,245,95,195,15,300,160,230,70];
+function typeHue(t){const k=String(t||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const def=Object.keys(TYPE_HUES).find(x=>x.toLowerCase()===k);if(def)return TYPE_HUES[def];
+  const ex=TYPES_().filter(x=>!(x in TYPE_HUES)).map(x=>x.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''));let i=ex.indexOf(k);
+  if(i<0){i=0;for(const ch of k)i=(i*31+ch.charCodeAt(0))>>>0}
+  return EXTRA_HUES[i%EXTRA_HUES.length]}
+const typeChip=t=>`<span class="chip ty" style="--th:${typeHue(t)}">${esc(t)}</span>`;
+const routineTypes=r=>r?[...new Set(blocksOf(r).map(b=>(b.type||'').trim()).filter(t=>t&&t!=='__new'))]:[];
+function dayTypes(ds){const d=S.days.find(x=>x.id===ds);if(d&&d.type)return [d.type];
+  let ts=d&&d.routineId?routineTypes(byId('routines',d.routineId)):[];if(ts.length)return ts;
+  const p=plansOn(ds)[0];if(p){ts=routineTypes(byId('routines',p.routineId));if(ts.length)return ts;if(p.type)return [p.type]}
+  const x=sessionsOn(ds).find(x=>x.routineId);return x?routineTypes(byId('routines',x.routineId)):[]}
+const dayDone=ds=>sessionsOn(ds).length>0||(ds<=today()&&boardsOn(ds).length>0);
 const blocksOf=r=>(r&&r.blocks&&r.blocks.length)?r.blocks:[{type:(r&&r.type)||'',mins:''}];
 const typeLabel=bl=>bl.filter(b=>b.type).map(b=>b.type+(b.mins?` ${b.mins}'`:'')).join(' + ');
 const WP=()=>(CFG&&CFG.wordP)||'Clientes';
@@ -480,28 +506,69 @@ function vCalendar(){
   for(let d=1;d<=days;d++){
     const ds=iso(new Date(y,m,d)),cs=classesOn(ds),ps=plansOn(ds).filter(p=>!S.sessions.some(s=>s.planId===p.id));
     const dots=cs.slice(0,4).map(()=>'<i class="dot"></i>').join('')+ps.slice(0,4).map(()=>`<i class="dot ${ds<t?'miss':'plan'}"></i>`).join('');
-    cells+=`<button class="day ${ds<t?'past':''} ${ds===t?'today':''}" data-act="open-day" data-id="${ds}" aria-label="${esc(fmtDate(ds,{day:'numeric',month:'long'}))}"><span class="num">${d}</span><span class="dots">${dots}${boardsOn(ds).length?'<span class="cam" aria-label="Foto de la pizarra">📷</span>':''}</span></button>`;
+    const ts=dayTypes(ds),tsty=ts.length?` style="--th:${typeHue(ts[0])};--th2:${typeHue(ts[1]||ts[0])}"`:'';
+    cells+=`<button class="day ${ds<t?'past':''} ${ds===t?'today':''} ${ts.length?'typed':''} ${ts.length>1?'typed2':''} ${ts.length&&!dayDone(ds)?'planned':''}"${tsty} data-act="open-day" data-id="${ds}" aria-label="${esc(fmtDate(ds,{day:'numeric',month:'long'})+(ts.length?' · '+ts.join(' + ')+(dayDone(ds)?'':' (planificado)'):''))}"><span class="num">${d}</span><span class="dots">${dots}${boardsOn(ds).length?'<span class="cam" aria-label="Foto de la pizarra">📷</span>':''}</span></button>`;
   }
   const mName=(m=>m.charAt(0).toUpperCase()+m.slice(1))(calMonth.toLocaleDateString('es-ES',{month:'long'}))+' '+y;
-  return `<h1>Calendario</h1><p class="muted" style="margin-top:6px">Toca un día: si ya pasó verás qué clases se hicieron; si aún no ha llegado podrás planificar qué entrenamiento toca.</p>
+  return `<h1>Calendario</h1><p class="muted" style="margin-top:6px">Toca un día para planificar su entrenamiento o ver lo que se hizo. Cada color es un tipo de entrenamiento.</p>
   <div class="section">
     <div class="monthbar"><button class="btn" data-act="cal-prev" aria-label="Mes anterior">${ic('back')}</button><h2>${esc(mName)}</h2><button class="btn" data-act="cal-next" aria-label="Mes siguiente" style="transform:scaleX(-1)">${ic('back')}</button></div>
     <div class="cal">${['L','M','X','J','V','S','D'].map(d=>`<span class="dow">${d}</span>`).join('')}${cells}</div>
-    <div class="legend"><span><i class="dot"></i>Clase hecha</span><span><i class="dot plan"></i>Planificada</span><span><i class="dot miss"></i>Planificada sin apuntar</span></div>
+    <div class="legend">${TYPES_().map(x=>`<span><i class="tsw" style="--th:${typeHue(x)}"></i>${esc(x)}</span>`).join('')}</div>
+    <div class="legend small"><span><i class="tsw" style="--th:212"></i>Hecho</span><span><i class="tsw planned" style="--th:212"></i>Planificado</span><span><i class="dot"></i>Han venido a clase</span><span>📷 Foto</span></div>
     ${(calMonth.getFullYear()!==new Date().getFullYear()||calMonth.getMonth()!==new Date().getMonth())?`<button class="btn" data-act="cal-today">Volver a este mes</button>`:''}
   </div>`;
 }
 function openDay(ds){
-  const t=today(), cs=classesOn(ds,true), ps=plansOn(ds);
-  const title=fmtDate(ds,{weekday:'long',day:'numeric',month:'long'});
+  const t=today(),cs=classesOn(ds,true),ts=dayTypes(ds),bs=boardsOn(ds),plan=plansOn(ds)[0];
+  const name=dayTitle(ds)||(plan&&byId('routines',plan.routineId)?planTitle(plan):'');
+  const title=capFirst(fmtDate(ds,{weekday:'long',day:'numeric',month:'long'}));
   let html='';
-  if(ds<=t){html+=(boardsOn(ds).length||dayTitle(ds)?dayTitleRow(ds):'')+boardSection(ds)+attSummary(ds);
-    if(cs.length)html+=`<div class="stack"><span class="label">Clases apuntadas antes</span><div class="list">${cs.map(classCard).join('')}</div></div>`}
-  if(ps.length||ds>=t)html+=`<div class="stack"><span class="label">Planificado</span>${ps.length?`<div class="list">${ps.map(planCard).join('')}</div>`:'<div class="empty">Nada planificado todavía.</div>'}</div>`;
-  html+=ds>=t?`<button type="button" class="btn btn-primary btn-big" data-act="new-plan" data-id="${ds}">${ic('plus')} Planificar entrenamiento</button>`:'';
-  if(ds>t)html+=boardSection(ds);
-  openSheet(title.charAt(0).toUpperCase()+title.slice(1),html,closeSheet,{saveLabel:'Cerrar',info:true});
+  if(ts.length||name||bs.length){
+    html+=`<div class="stack"><span class="label">${ds>t?'Planificado':'Entrenamiento'}</span>
+     <div class="card" style="gap:10px"><div class="row" style="gap:6px;flex-wrap:wrap">${ts.map(typeChip).join('')||'<span class="chip">Sin tipo</span>'}</div>
+      <b style="font-size:1.15rem">${name?esc(name):'<span class="muted">Sin nombre</span>'}</b>${bs.length?boardThumbs(bs):''}</div>
+     <button type="button" class="btn btn-big" data-act="plan-day" data-id="${ds}">✏️ Cambiar entrenamiento</button></div>`;
+  }else html+=`<p class="muted">${ds>=t?'Todavía no hay nada planificado este día.':'Este día no se apuntó ningún entrenamiento.'}</p>
+    <button type="button" class="btn btn-primary btn-big" data-act="plan-day" data-id="${ds}">${ic('plus')} Planificar entrenamiento</button>`;
+  if(ds<=t&&(bs.length||name||sessionsOn(ds).some(x=>x.shift)))html+=attSummary(ds);
+  if(ds<=t&&cs.length)html+=`<div class="stack"><span class="label">Clases apuntadas antes</span><div class="list">${cs.map(classCard).join('')}</div></div>`;
+  openSheet(title,html,closeSheet,{saveLabel:'Cerrar',info:true});
   reopen=()=>openDay(ds);
+}
+let pdType=null;
+function typePick(){const T=TYPES_();if(pdType&&!T.includes(pdType))T.push(pdType);
+  return T.map(t=>`<button type="button" data-act="pd-type" data-id="${esc(t)}" style="--th:${typeHue(t)}" aria-pressed="${pdType===t}"><i class="tsw"></i>${esc(t)}</button>`).join('')}
+function pdAutoType(){if(pdType)return;const r=routineByName(fv('nd-name'));const t=r&&routineTypes(r)[0];if(!t)return;pdType=t;const el=document.getElementById('pd-types');if(el)el.innerHTML=typePick()}
+function planDayForm(ds){
+  newDayPhoto=null;const d=S.days.find(x=>x.id===ds),plan=plansOn(ds)[0],bs=boardsOn(ds);
+  pdType=dayTypes(ds)[0]||null;
+  const name=dayTitle(ds)||(plan&&byId('routines',plan.routineId)?planTitle(plan):'');
+  const has=!!(d&&(d.type||d.title))||!!plan;
+  openSheet(has?'Cambiar entrenamiento':'Planificar entrenamiento',`
+   <p class="muted" style="margin:0">${esc(capFirst(fmtDate(ds,{weekday:'long',day:'numeric',month:'long'})))}</p>
+   <div class="field"><span>Tipo de entrenamiento</span><div class="tpick" id="pd-types">${typePick()}</div>
+     <input id="pd-other" placeholder="¿Otro tipo? Escríbelo aquí" autocomplete="off" enterkeyhint="done" aria-label="Otro tipo de entrenamiento"></div>
+   ${field('nd-name','Nombre (opcional)',inp('nd-name',name,'placeholder="Ej.: Piernas y core" autocomplete="off" list="nd-routines"'))}
+   <datalist id="nd-routines">${S.routines.map(r=>`<option value="${esc(r.name)}">`).join('')}</datalist>
+   <div class="field"><span>Foto de la pizarra (opcional)</span>${bs.length?`<small>Este día ya tiene ${bs.length===1?'una foto':bs.length+' fotos'}. Puedes añadir otra.</small>`:''}<div id="nd-prev"></div>
+     <label class="btn btn-big" for="nd-photo" style="cursor:pointer" id="nd-photo-lbl">📷 Hacer o elegir foto</label><input id="nd-photo" type="file" accept="image/*" hidden></div>
+   <button type="submit" class="btn btn-primary btn-big">Guardar</button>`,
+  async()=>{
+    const other=fv('pd-other'),nm=fv('nd-name'),rr=nm?routineByName(nm):null;
+    const type=other||pdType||(rr&&routineTypes(rr)[0])||'';
+    if(!type){toast('Elige el tipo de entrenamiento');return}
+    if(other)addTypes([other]);
+    let photo=newDayPhoto;if(!photo&&!bs.length&&rr&&(rr.photos||[]).length&&okImg(rr.photos[0]))photo=rr.photos[0];
+    if(!(await saveDayTitle(ds,nm,photo,type,true)))return;
+    if(photo&&!(await save('boards',uid(),{date:ds,photo,createdAt:Date.now()})))return;
+    newDayPhoto=null;toast(has?'Entrenamiento cambiado':'Entrenamiento planificado');
+    if(route().v==='calendario')setTimeout(()=>openDay(ds),50);else{closeSheet();render()}
+  },has?{del:{label:'Quitar del calendario',run:async()=>{
+    let ok=true;
+    if(d){if(!bs.length&&!sessionsOn(ds).some(x=>x.shift))ok=await remove('days',ds);else{const dd={...d,type:'',updatedAt:Date.now()};delete dd.id;ok=await save('days',ds,dd)}}
+    for(const p of plansOn(ds))if(!S.sessions.some(x=>x.planId===p.id))ok=(await remove('plans',p.id))&&ok;
+    if(ok){toast('Quitado del calendario');if(route().v==='calendario')setTimeout(()=>openDay(ds),50);else{closeSheet();render()}}}}}:{});
 }
 function planForm(ds,p){
   const done=p&&S.sessions.some(s=>s.planId===p.id);
@@ -679,7 +746,8 @@ async function exportXlsx(btn){
     const alumnos=[...S.clients].sort((a,b)=>a.name.localeCompare(b.name,'es')).map(c=>{const ss=sessionsOf(c.id);return {'Nombre':c.name,'Horario':shiftName(c.shift),'Empezó el':c.startDate||'','Días por semana':c.daysPerWeek||'','Peso (kg)':curWeight(c)??'','Altura (cm)':c.height??'','Indicaciones':c.injuries||'','Anotaciones':c.notes||'','Estado':c.active===false?'De baja':'Activo','Entrenamientos':ss.length,'Última clase':ss[0]?.date||''}});
     const entrenos=[];[...S.sessions].sort((a,b)=>(a.date||'').localeCompare(b.date||'')).forEach(x=>{const base={'Fecha':x.date,[WS()]:cname(x.clientId),'Entrenamiento':x.routineName||'Sesión libre','Clase':x.shift?(x.shift==='manana'?'Mañana':'Tarde'):'','Nota (1-10)':x.score??'','Esfuerzo (1-10)':x.rpe??'','Notas':x.notes||''};const ex=(x.exercises||[]).filter(e=>e.name);if(!ex.length)entrenos.push(base);else ex.forEach(e=>entrenos.push({...base,...exCols(e)}))});
     const rutinas=[];[...S.routines].sort((a,b)=>a.name.localeCompare(b.name,'es')).forEach(r=>{const bl=blocksOf(r);const ex=r.exercises||[];const base={'Rutina':r.name,'Tipo':r.type||typeLabel(bl),'Descripción':r.description||''};if(!ex.length)rutinas.push(base);else ex.forEach(e=>{const b=bl[Math.min(+e.block||0,bl.length-1)]||{};rutinas.push({...base,'Parte':bl.length>1?`${(+e.block||0)+1} · ${b.type}`:(b.type||''),...exCols(e)})})});
-    const calendario=[...S.plans].sort((a,b)=>a.date.localeCompare(b.date)).map(p=>({'Fecha':p.date,'Entrenamiento':planTitle(p),'Tipo':p.type||'','Notas':p.notes||'','Apuntada':S.sessions.some(x=>x.planId===p.id)?'Sí':'No','Asistentes':S.sessions.filter(x=>x.planId===p.id).length}));
+    const calendario=[...S.plans.filter(p=>!S.days.some(d=>d.id===p.date&&(d.type||d.title))).map(p=>({'Fecha':p.date,'Entrenamiento':planTitle(p),'Tipo':p.type||'','Notas':p.notes||'','Apuntada':S.sessions.some(x=>x.planId===p.id)?'Sí':'No','Asistentes':S.sessions.filter(x=>x.planId===p.id).length})),
+      ...S.days.filter(d=>d.type||d.title).map(d=>{const n=sessionsOn(d.id).filter(x=>x.shift).length;return {'Fecha':d.id,'Entrenamiento':d.title||'','Tipo':dayTypes(d.id).join(' + '),'Notas':'','Apuntada':n?'Sí':'No','Asistentes':n}})].sort((a,b)=>a['Fecha'].localeCompare(b['Fecha']));
     const medidas=[...S.measures].sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(m=>({'Fecha':m.date,[WS()]:cname(m.clientId),'Peso (kg)':m.weight??'','Grasa (%)':m.fat??'','Cintura (cm)':m.waist??'','Notas':m.notes||''}));
     const wb=X.utils.book_new();
     const add=(rows,name)=>{const ws=X.utils.json_to_sheet(rows.length?rows:[{'(vacío)':''}]);const keys=Object.keys(rows[0]||{'(vacío)':''});ws['!cols']=keys.map(k=>({wch:Math.min(40,Math.max(k.length,...rows.map(r=>String(r[k]??'').length))+2)}));X.utils.book_append_sheet(wb,ws,name)};
@@ -745,11 +813,11 @@ function attSummary(ds){
    <button type="button" class="btn btn-primary btn-big" data-act="att-menu" data-id="${ds}">${ic('users')} Asistencia a la clase</button></div>`;
 }
 function homeTraining(){
-  const t=today(),bs=boardsOn(t);
-  if(!bs.length)return `<button type="button" class="btn btn-primary btn-big" data-act="new-day">${ic('plus')} Apuntar entrenamiento</button>
+  const t=today(),bs=boardsOn(t),ts=dayTypes(t),tc=ts.length?`<div class="row" style="gap:6px;flex-wrap:wrap">${ts.map(typeChip).join('')}</div>`:'';
+  if(!bs.length)return `${ts.length||dayTitle(t)?`<div class="card" style="gap:8px"><span class="label">Hoy toca</span>${tc}${dayTitle(t)?`<b style="font-size:1.1rem">${esc(dayTitle(t))}</b>`:''}</div>`:''}<button type="button" class="btn btn-primary btn-big" data-act="new-day">${ic('plus')} Apuntar entrenamiento</button>
     <p class="small muted" style="text-align:center;margin-top:-4px">Te pedirá el nombre y una foto de la pizarra.</p>`;
   const b=(sh,l)=>{const n=attOf(t,sh).length;return `<button type="button" class="btn btn-big btn-primary" data-act="att-home" data-id="${sh}" style="justify-content:space-between"><span>${l}</span>${n?`<span class="chip" style="background:var(--surface);color:var(--accent)">${n} ✓</span>`:''}</button>`};
-  return `<div class="stack" style="gap:10px"><span class="label">Entrenamiento de hoy</span>${dayTitleRow(t)}${boardThumbs(bs,true)}
+  return `<div class="stack" style="gap:10px"><span class="label">Entrenamiento de hoy</span>${dayTitleRow(t)}${tc}${boardThumbs(bs,true)}
     <p class="small muted" style="text-align:center;margin-top:-2px">Toca la foto para verla en grande o borrarla.</p>
     ${b('manana','Asistencia de mañana')}${b('tarde','Asistencia de tarde')}
     <label class="linkbtn" for="home-board2">📷 Añadir foto de otra pizarra</label><input id="home-board2" class="board-in" type="file" accept="image/*" data-date="${t}" hidden></div>`;
@@ -760,12 +828,14 @@ function lastDone(r){let m='';const t=today();
   S.days.forEach(d=>{if(d.routineId===r.id&&d.date<=t&&d.date>m)m=d.date});
   S.sessions.forEach(x=>{if(x.routineId===r.id&&x.date<=t&&x.date>m)m=x.date});
   return m}
-async function linkRoutine(ds,title,photo){
+async function linkRoutine(ds,title,photo,type){
   const d=S.days.find(x=>x.id===ds),old=d&&d.routineId?byId('routines',d.routineId):null;
   let r=routineByName(title);
   if(!r&&old&&old.fromDay&&!S.days.some(x=>x.id!==ds&&x.routineId===old.id)){const o={...old,name:title};delete o.id;if(await save('routines',old.id,o))r={...o,id:old.id}}
-  if(!r){const id=uid(),o={name:title,blocks:[{type:'',mins:''}],type:'',description:'',exercises:[],photos:photo?[photo]:[],fromDay:true,createdAt:Date.now()};if(!(await save('routines',id,o)))return null;r={...o,id}}
-  else if(photo&&!(r.photos||[]).length){const o={...r,photos:[photo]};delete o.id;await save('routines',r.id,o)}
+  if(!r){const id=uid(),o={name:title,blocks:[{type:type||'',mins:''}],type:type||'',description:'',exercises:[],photos:photo?[photo]:[],fromDay:true,createdAt:Date.now()};if(!(await save('routines',id,o)))return null;r={...o,id}}
+  else{const up={};if(photo&&!(r.photos||[]).length)up.photos=[photo];
+    if(type&&!routineTypes(r).length){up.type=type;up.blocks=(r.blocks&&r.blocks.length)?r.blocks.map((b,i)=>i===0?{...b,type}:b):[{type,mins:''}]}
+    if(Object.keys(up).length){const o={...r,...up};delete o.id;await save('routines',r.id,o)}}
   return r.id;
 }
 let migDaysRunning=false;const migDaysDone=new Set();
@@ -776,18 +846,21 @@ async function migrateDays(){if(migDaysRunning)return;migDaysRunning=true;
   finally{migDaysRunning=false}}
 const dayTitle=ds=>{const d=S.days.find(x=>x.id===ds);return d&&d.title?d.title:''};
 const dayTitleRow=ds=>{const tt=dayTitle(ds);return `<div class="row between" style="gap:8px"><h2 style="margin:0;min-width:0" class="ellip">${tt?esc(tt):'<span class="muted">Sin nombre</span>'}</h2><button type="button" class="btn btn-ghost" style="min-height:40px;flex:none" data-act="day-name" data-id="${ds}">${tt?'Cambiar nombre':'Poner nombre'}</button></div>`};
-async function saveDayTitle(ds,title,photo){
-  const d=S.days.find(x=>x.id===ds);const rid=await linkRoutine(ds,title,photo);
-  if(!(await save('days',ds,{...(d||{}),date:ds,title,routineId:rid||null,updatedAt:Date.now(),createdAt:d&&d.createdAt||Date.now()})))return false;
-  for(const x of sessionsOn(ds).filter(x=>x.shift&&(x.routineName!==title||x.routineId!==rid))){const dd={...x,routineName:title,routineId:rid||null};delete dd.id;await save('sessions',x.id,dd)}
+async function saveDayTitle(ds,title,photo,type,clear){
+  const d=S.days.find(x=>x.id===ds);const rid=title?await linkRoutine(ds,title,photo,type):clear?null:(d&&d.routineId)||null;
+  const doc={...(d||{}),date:ds,title:title||(clear?'':(d&&d.title)||''),routineId:rid||null,updatedAt:Date.now(),createdAt:d&&d.createdAt||Date.now()};delete doc.id;
+  if(type!==undefined&&type!==null)doc.type=type;
+  if(!(await save('days',ds,doc)))return false;
+  if(title)for(const x of sessionsOn(ds).filter(x=>x.shift&&(x.routineName!==title||x.routineId!==rid))){const dd={...x,routineName:title,routineId:rid||null};delete dd.id;await save('sessions',x.id,dd)}
   return true;
 }
 let newDayPhoto=null;
 function newDayForm(ds){
-  newDayPhoto=null;const plan=plansOn(ds)[0];
+  newDayPhoto=null;const plan=plansOn(ds)[0];pdType=dayTypes(ds)[0]||null;
   openSheet(ds===today()?'Entrenamiento de hoy':capFirst(fmtDate(ds,{weekday:'long',day:'numeric',month:'long'})),`
    ${field('nd-name','¿Cómo se llama el entrenamiento?',inp('nd-name',dayTitle(ds)||(plan?planTitle(plan):''),'placeholder="Ej.: AMRAP piernas" autocomplete="off" list="nd-routines"'),S.routines.length?'Si ya lo hiciste otro día, elige su nombre y no hará falta repetir la foto.':'')}
    <datalist id="nd-routines">${S.routines.map(r=>`<option value="${esc(r.name)}">`).join('')}</datalist>
+   <div class="field"><span>Tipo (opcional)</span><div class="tpick" id="pd-types">${typePick()}</div></div>
    <div class="field"><span>Foto de la pizarra</span><div id="nd-prev"></div>
      <label class="btn btn-big" for="nd-photo" style="cursor:pointer" id="nd-photo-lbl">📷 Hacer o elegir foto</label><input id="nd-photo" type="file" accept="image/*" hidden></div>
    <button type="submit" class="btn btn-primary btn-big">Guardar entrenamiento</button>`,
@@ -795,7 +868,7 @@ function newDayForm(ds){
     const name=fv('nd-name');if(!name){toast('Escribe el nombre del entrenamiento');document.getElementById('nd-name').focus();return}
     const rr=routineByName(name);if(!newDayPhoto&&rr&&(rr.photos||[]).length&&okImg(rr.photos[0]))newDayPhoto=rr.photos[0];
     if(!newDayPhoto){toast('Falta la foto de la pizarra');return}
-    if(!(await saveDayTitle(ds,name,newDayPhoto)))return;
+    if(!(await saveDayTitle(ds,name,newDayPhoto,pdType||(rr&&routineTypes(rr)[0])||null)))return;
     if(await save('boards',uid(),{date:ds,photo:newDayPhoto,createdAt:Date.now()})){newDayPhoto=null;closeSheet();toast('Entrenamiento guardado');render()}
   },{saveLabel:'Guardar'});
   setTimeout(()=>document.getElementById('nd-name')?.focus(),50);
@@ -874,7 +947,9 @@ function attReadRates(){document.querySelectorAll('#sheet .att-rate').forEach(el
 function attFilter(){if(!att)return;const q=nameKey(att.q);let n=0;
   document.querySelectorAll('#att-list [data-act=att-toggle]').forEach(b=>{const sh=b.dataset.shift;const show=(!q||b.dataset.name.includes(q))&&(!att.f||sh===att.f||sh==='ambos');b.hidden=!show;if(show)n++});
   const none=document.getElementById('att-none');if(none){none.style.display=n>0?'none':'';none.textContent=q?'Nadie con ese nombre en este filtro.':'No hay nadie en este horario.'}}
-document.addEventListener('input',e=>{if(e.target.id!=='att-q'||!att)return;att.q=e.target.value;attFilter()});
+document.addEventListener('input',e=>{if(e.target.id==='nd-name'&&document.getElementById('pd-types')){pdAutoType();return}
+  if(e.target.id==='pd-other'&&e.target.value.trim()&&pdType){pdType=null;document.querySelectorAll('#pd-types button').forEach(b=>b.setAttribute('aria-pressed','false'))}
+  if(e.target.id!=='att-q'||!att)return;att.q=e.target.value;attFilter()});
 async function saveAtt(){
   const {ds,sh,ex,sel}=att;
   const plan=plansOn(ds)[0],rn=dayTitle(ds)||(plan?planTitle(plan):'Clase de '+(sh==='manana'?'mañana':'tarde'));
@@ -1306,8 +1381,9 @@ document.addEventListener('click',async e=>{
     case 'f-days':{const on=a.getAttribute('aria-pressed')!=='true';document.querySelectorAll('#days-btns button').forEach(b=>{const m=on&&b===a;b.setAttribute('aria-pressed',String(m));b.classList.toggle('btn-primary',m)});break}
     case 'f-shift':{const on=a.getAttribute('aria-pressed')!=='true';a.setAttribute('aria-pressed',String(on));a.classList.toggle('btn-primary',on);break}
     case 'open-day':openDay(id);break;
-    case 'new-plan':planForm(id);break;
-    case 'open-plan':{const p=byId('plans',id);if(p)planForm(p.date,p);break}
+    case 'new-plan':case 'plan-day':planDayForm(id);break;
+    case 'open-plan':{const p=byId('plans',id);if(p)planDayForm(p.date);break}
+    case 'pd-type':{pdType=pdType===id?null:id;document.querySelectorAll('#pd-types button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.id===pdType)));const o=document.getElementById('pd-other');if(o&&pdType)o.value='';break}
     case 'plan-done':{const p=byId('plans',id);closeSheet();trainingDay(p.date);break}
     case 'log-day':trainingDay(id);break;
     case 'training-day':trainingDay(id);break;
