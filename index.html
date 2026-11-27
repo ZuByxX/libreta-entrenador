@@ -154,6 +154,9 @@ textarea{min-height:90px;resize:vertical}
 .day.typed.planned{background:hsl(var(--th) 78% var(--tc-l) / .38);border:2px dashed hsl(var(--th) 60% var(--tcb-l))}
 .day.typed2.planned{background:linear-gradient(135deg,hsl(var(--th) 78% var(--tc-l) / .38) 50%,hsl(var(--th2) 78% var(--tc-l) / .38) 50%)}
 .day.typed.today{border:3px solid var(--fg)}
+.tlegend{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px;padding:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.tlegend>span{display:flex;align-items:center;gap:8px;min-width:0;padding:8px 10px;border-radius:999px;background:hsl(var(--th) 78% var(--tc-l) / .55);color:hsl(var(--th) 70% var(--sc-fg));font-weight:600;font-size:.92rem}
+.tlegend i{width:12px;height:12px;border-radius:50%;flex:none;background:hsl(var(--th) 65% 50%);box-shadow:0 0 0 2px var(--surface)}
 .tsw.planned{background:hsl(var(--th) 78% var(--tc-l) / .38);border:2px dashed hsl(var(--th) 60% var(--tcb-l))}
 .tsw{width:14px;height:14px;border-radius:4px;display:inline-block;flex:none;background:hsl(var(--th) 78% var(--tc-l));border:1px solid hsl(var(--th) 60% var(--tcb-l))}
 .chip.ty{background:hsl(var(--th) 78% var(--tc-l));color:hsl(var(--th) 70% var(--sc-fg))}
@@ -569,8 +572,7 @@ function vCalendar(){
   <div class="section">
     <div class="monthbar"><button class="btn" data-act="cal-prev" aria-label="Mes anterior">${ic('back')}</button><h2>${esc(mName)}</h2><button class="btn" data-act="cal-next" aria-label="Mes siguiente" style="transform:scaleX(-1)">${ic('back')}</button></div>
     <div class="cal">${['L','M','X','J','V','S','D'].map(d=>`<span class="dow">${d}</span>`).join('')}${cells}</div>
-    <div class="legend">${TYPES_().map(x=>`<span><i class="tsw" style="--th:${typeHue(x)}"></i>${esc(x)}</span>`).join('')}</div>
-    <div class="legend small"><span><i class="tsw" style="--th:212"></i>Hecho</span><span><i class="tsw planned" style="--th:212"></i>Planificado</span><span><i class="dot"></i>Han venido a clase</span><span>📷 Foto</span></div>
+    <div class="tlegend">${TYPES_().map(x=>`<span style="--th:${typeHue(x)}"><i></i><span class="ellip">${esc(x)}</span></span>`).join('')}</div>
     ${(calMonth.getFullYear()!==new Date().getFullYear()||calMonth.getMonth()!==new Date().getMonth())?`<button class="btn" data-act="cal-today">Volver a este mes</button>`:''}
   </div>`;
 }
