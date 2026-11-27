@@ -157,6 +157,9 @@ textarea{min-height:90px;resize:vertical}
 .tlegend{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px;padding:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
 .tlegend>span{display:flex;align-items:center;gap:8px;min-width:0;padding:8px 10px;border-radius:999px;background:hsl(var(--th) 78% var(--tc-l) / .55);color:hsl(var(--th) 70% var(--sc-fg));font-weight:600;font-size:.92rem}
 .tlegend i{width:12px;height:12px;border-radius:50%;flex:none;background:hsl(var(--th) 65% 50%);box-shadow:0 0 0 2px var(--surface)}
+.calwho{width:auto;max-width:58%;min-height:42px;padding:0 34px 0 14px;border-radius:999px;font-weight:600;font-size:1rem;flex:none}
+.day.went{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.wck{font-style:normal;font-weight:800;font-size:.9rem;line-height:1}
 .tsw.planned{background:hsl(var(--th) 78% var(--tc-l) / .38);border:2px dashed hsl(var(--th) 60% var(--tcb-l))}
 .tsw{width:14px;height:14px;border-radius:4px;display:inline-block;flex:none;background:hsl(var(--th) 78% var(--tc-l));border:1px solid hsl(var(--th) 60% var(--tcb-l))}
 .chip.ty{background:hsl(var(--th) 78% var(--tc-l));color:hsl(var(--th) 70% var(--sc-fg))}
@@ -292,6 +295,7 @@ const shiftName=v=>v==='ambos'?'Mañana y tarde':(SHIFTS.find(x=>x[0]===v)||[])[
 const inShift=(c,f)=>!f||c.shift===f||c.shift==='ambos';
 const segFilter=(act,cur)=>`<div class="seg" role="group" aria-label="Filtrar por horario">${[['','Todos'],...SHIFTS].map(([v,l])=>`<button type="button" data-act="${act}" data-id="${v}" aria-pressed="${cur===v}">${l}</button>`).join('')}</div>`;
 const clientsFiltered=()=>S.clients.filter(c=>(!search||nameKey(c.name).includes(nameKey(search)))&&inShift(c,cFilter)).sort((a,b)=>(a.active===false)-(b.active===false)||a.name.localeCompare(b.name,'es'));
+let calWho='',calLegend=false;
 let calMonth=(()=>{const d=new Date();return new Date(d.getFullYear(),d.getMonth(),1)})();
 const iso=d=>{const x=new Date(d);x.setMinutes(x.getMinutes()-x.getTimezoneOffset());return x.toISOString().slice(0,10)};
 const plansOn=(date)=>S.plans.filter(p=>p.date===date).sort((a,b)=>(a.time||'99').localeCompare(b.time||'99'));
@@ -560,19 +564,29 @@ function classCard(k){
 function vCalendar(){
   const y=calMonth.getFullYear(),m=calMonth.getMonth();
   const first=(new Date(y,m,1).getDay()+6)%7, days=new Date(y,m+1,0).getDate(), t=today();
+  const who=calWho?byId('clients',calWho):null;let nWent=0;
   let cells='';for(let i=0;i<first;i++)cells+='<span class="day blank"></span>';
   for(let d=1;d<=days;d++){
-    const ds=iso(new Date(y,m,d)),cs=classesOn(ds),ps=plansOn(ds).filter(p=>!S.sessions.some(s=>s.planId===p.id));
-    const dots=cs.slice(0,4).map(()=>'<i class="dot"></i>').join('')+ps.slice(0,4).map(()=>`<i class="dot ${ds<t?'miss':'plan'}"></i>`).join('');
-    const ts=dayTypes(ds),tsty=ts.length?` style="--th:${typeHue(ts[0])};--th2:${typeHue(ts[1]||ts[0])}"`:'';
-    cells+=`<button class="day ${ds<t?'past':''} ${ds===t?'today':''} ${ts.length?'typed':''} ${ts.length>1?'typed2':''} ${ts.length&&!dayDone(ds)?'planned':''}"${tsty} data-act="open-day" data-id="${ds}" aria-label="${esc(fmtDate(ds,{day:'numeric',month:'long'})+(ts.length?' · '+ts.join(' + ')+(dayDone(ds)?'':' (planificado)'):''))}"><span class="num">${d}</span><span class="dots">${dots}${boardsOn(ds).length?'<span class="cam" aria-label="Foto de la pizarra">📷</span>':''}</span></button>`;
+    const ds=iso(new Date(y,m,d));let cls='',tsty='',lbl=fmtDate(ds,{day:'numeric',month:'long'}),mark='';
+    const ts=dayTypes(ds);if(ts.length)tsty=` style="--th:${typeHue(ts[0])};--th2:${typeHue(ts[1]||ts[0])}"`;
+    if(who){const went=S.sessions.some(x=>x.clientId===who.id&&x.date===ds);
+      if(went){nWent++;cls=ts.length?`typed ${ts.length>1?'typed2':''}`:'went';mark='<i class="wck">✓</i>';lbl+=' · Vino'+(ts.length?' · '+ts.join(' + '):'')}else tsty=''}
+    else{if(ts.length){cls=`typed ${ts.length>1?'typed2':''} ${dayDone(ds)?'':'planned'}`;lbl+=' · '+ts.join(' + ')+(dayDone(ds)?'':' (planificado)')}
+      if(boardsOn(ds).length){mark='<i class="dot"></i>';lbl+=' · Con foto'}}
+    cells+=`<button class="day ${ds<t?'past':''} ${ds===t?'today':''} ${cls}"${tsty} data-act="open-day" data-id="${ds}" aria-label="${esc(lbl)}"><span class="num">${d}</span><span class="dots">${mark}</span></button>`;
   }
   const mName=(m=>m.charAt(0).toUpperCase()+m.slice(1))(calMonth.toLocaleDateString('es-ES',{month:'long'}))+' '+y;
-  return `<h1>Calendario</h1><p class="muted" style="margin-top:6px">Toca un día para planificar su entrenamiento o ver lo que se hizo. Cada color es un tipo de entrenamiento.</p>
+  const ppl=S.clients.filter(c=>c.active!==false||c.id===calWho).sort(byName);
+  const mLow=calMonth.toLocaleDateString('es-ES',{month:'long'});
+  return `<div class="row between" style="gap:12px;flex-wrap:nowrap"><h1>Calendario</h1>
+    <select id="cal-who" class="calwho" aria-label="Ver el calendario de"><option value="">Todos</option>${ppl.map(c=>`<option value="${esc(c.id)}" ${c.id===calWho?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>
+  ${who?`<p style="margin-top:6px"><b>${esc(who.name)}</b> ha venido <b>${nWent} ${nWent===1?'día':'días'}</b> en ${esc(mLow)}.</p>`
+    :`<p class="muted" style="margin-top:6px">Toca un día para planificar su entrenamiento o ver lo que se hizo. Cada color es un tipo de entrenamiento.</p>`}
   <div class="section">
     <div class="monthbar"><button class="btn" data-act="cal-prev" aria-label="Mes anterior">${ic('back')}</button><h2>${esc(mName)}</h2><button class="btn" data-act="cal-next" aria-label="Mes siguiente" style="transform:scaleX(-1)">${ic('back')}</button></div>
     <div class="cal">${['L','M','X','J','V','S','D'].map(d=>`<span class="dow">${d}</span>`).join('')}${cells}</div>
-    <div class="tlegend">${TYPES_().map(x=>`<span style="--th:${typeHue(x)}"><i></i><span class="ellip">${esc(x)}</span></span>`).join('')}</div>
+    <button type="button" class="linkbtn" data-act="cal-legend" aria-expanded="${calLegend}">${calLegend?'Ocultar leyenda ▴':'Mostrar leyenda ▾'}</button>
+    <div class="tlegend"${calLegend?'':' hidden'}>${TYPES_().map(x=>`<span style="--th:${typeHue(x)}"><i></i><span class="ellip">${esc(x)}</span></span>`).join('')}</div>
     ${(calMonth.getFullYear()!==new Date().getFullYear()||calMonth.getMonth()!==new Date().getMonth())?`<button class="btn" data-act="cal-today">Volver a este mes</button>`:''}
   </div>`;
 }
@@ -1511,6 +1525,7 @@ document.addEventListener('click',async e=>{
     case 'weight-chart':weightChart(id);break;
     case 'cal-prev':calMonth=new Date(calMonth.getFullYear(),calMonth.getMonth()-1,1);render();break;
     case 'cal-next':calMonth=new Date(calMonth.getFullYear(),calMonth.getMonth()+1,1);render();break;
+    case 'cal-legend':calLegend=!calLegend;render();break;
     case 'cal-today':{const d=new Date();calMonth=new Date(d.getFullYear(),d.getMonth(),1);render();break}
     case 'new-measure':measureForm(id);break;
     case 'edit-measure':{const m=byId('measures',id);measureForm(m.clientId,m);break}
@@ -1529,6 +1544,7 @@ document.addEventListener('input',e=>{if(e.target.id==='pk-q'){drawPicker();retu
 });
 document.addEventListener('change',async e=>{
   if(e.target.id==='backup-in'||e.target.id==='w-backup-in'){backupLoad(e.target);return}
+  if(e.target.id==='cal-who'){calWho=e.target.value;render();return}
   if(e.target.id==='r-photo-in'){const f=e.target.files&&e.target.files[0];e.target.value='';if(!f||!rDraft)return;try{const u=await boardImage(f);rDraft.photos=[...(rDraft.photos||[]),u];drawRoutinePhotos();toast('Foto añadida. Pulsa Guardar.')}catch(err){toast('No se pudo abrir la foto')}return}
   if(e.target.id==='nd-photo'){newDayPick(e.target);return}
   if(e.target.classList&&e.target.classList.contains('board-in')){addBoard(e.target);return}
