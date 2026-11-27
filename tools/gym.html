@@ -70,6 +70,7 @@ button.card:active{background:var(--surface-2)}
 .wstat{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .wstat div{display:flex;flex-direction:column;gap:2px}
 .wstat b{font-size:1.5rem}
+.btn-gold{background:linear-gradient(180deg,#ffd34d,#f0b400);border-color:#d99f00;color:#3b2a00;font-weight:700}
 .chip.score{background:hsl(var(--h) 72% var(--sc-bg));color:hsl(var(--h) 80% var(--sc-fg))}
 .cli .chips{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex:none}
 .boards.one{grid-template-columns:1fr}
@@ -315,7 +316,7 @@ function vHome(){
   ${todayPlans()}
   <div class="section">
     ${homeTraining()}
-    <button type="button" class="btn btn-big" data-act="challenge" style="margin-top:6px">🏆 Reto semanal${chOfWeek(weekStart(today()))?' · '+esc(chOfWeek(weekStart(today())).exercise):''}</button>
+    <button type="button" class="btn btn-big btn-gold" data-act="challenge" style="margin-top:6px">🏆 Reto semanal${chOfWeek(weekStart(today()))?' · '+esc(chOfWeek(weekStart(today())).exercise):''}</button>
   </div>
   ${act.length===0?`<div class="section"><div class="help"><h3>Cómo empezar</h3><p>1. En <b>Rutinas</b>, crea tus entrenamientos (AMRAP, EMOM…).</p><p>2. En <b>${WP()}</b>, añade a cada persona con su foto y si viene de mañana o de tarde.</p><p>3. En <b>Calendario</b>, elige qué entrenamiento toca cada día.</p><p>4. Cada día, pulsa <b>Apuntar entrenamiento</b> y haz la foto de la pizarra. Después pasa asistencia de mañana y de tarde.</p></div></div>`:''}
   ${need.length?`<div class="section"><div class="row between"><h2>Llevan más de una semana sin venir</h2></div><div class="list">${need.map(clientCard).join('')}</div></div>`:''}
@@ -852,11 +853,13 @@ function attStep1(){
    ${people.length?`<input id="att-q" type="search" placeholder="Buscar por nombre" autocomplete="off" value="${esc(att.q)}">${segFilter('attf',att.f)}`:''}
    ${people.length?`<div class="list" id="att-list">${people.map(c=>{const on=att.sel.has(c.id);return `<button type="button" class="card cli pickp" data-act="att-toggle" data-id="${esc(c.id)}" data-name="${esc(nameKey(c.name))}" data-shift="${esc(c.shift||'')}" aria-pressed="${on}">${avatar(c)}<span class="txt"><span class="name">${esc(c.name)}</span><span class="small muted ellip">${esc(shiftName(c.shift)||'')}${c.injuries?' · ⚠︎ '+esc(c.injuries):''}</span></span><span class="tick">${on?'✓':''}</span></button>`}).join('')}</div><p class="empty" id="att-none" style="display:none">Nadie con ese nombre.</p>`
      :`<div class="empty">Todavía no tienes ${wp()}. Añádelos en la pestaña ${WP()}.</div>`}
-   <button type="submit" class="btn btn-primary btn-big" id="att-next">Siguiente</button>`,
-  ()=>{if(!att.sel.size){if(att.ex.size){saveAtt();return}toast('Marca a las personas que han venido');return}attStep2()},{saveLabel:'Siguiente',noTop:true});
+`,
+  ()=>{if(!att.sel.size){if(att.ex.size){saveAtt();return}toast('Marca a las personas que han venido');return}attStep2()},{saveLabel:'Siguiente'});
+  const nb=document.querySelector('#sheet header [type=submit]');if(nb){nb.id='att-next';nb.style.whiteSpace='nowrap';nb.style.padding='0 12px';nb.style.flex='none'}
+  const cb=document.querySelector('#sheet header [data-act=close]');if(cb){cb.innerHTML=ic('back');cb.setAttribute('aria-label','Cancelar');cb.style.padding='0 8px';cb.style.flex='none'}
   attCount();attFilter();
 }
-function attCount(){const b=document.getElementById('att-next');if(b)b.textContent=att.sel.size?`Siguiente (${att.sel.size})`:(att.ex.size?'Guardar: no ha venido nadie':'Siguiente')}
+function attCount(){const b=document.getElementById('att-next');if(b)b.textContent=att.sel.size?`Siguiente (${att.sel.size})`:(att.ex.size?'Guardar':'Siguiente')}
 function attStep2(){
   const people=attPeople().filter(c=>att.sel.has(c.id));
   openSheet('Notas del entreno',`<p class="muted">Paso 2 de 2 · Ponle a cada uno una nota del 1 al 10. El comentario es opcional.</p>
